@@ -1,0 +1,179 @@
+Ran command: `git status`
+Listed directory CodeSync
+Ran command: `Get-ChildItem -Hidden -Path .`
+Ran command: `Get-ChildItem -Force`
+Listed directory tests
+Listed directory e2e-browser
+Listed directory fixtures
+Listed directory evidence
+Viewed package.json:1-40
+Viewed PHASE-1D.1-REAL-BROWSER-VALIDATION-FINAL-REPORT.md:1-100
+Viewed PHASE-1D.1-REAL-BROWSER-VALIDATION-FINAL-REPORT.md:101-250
+Viewed rb-lifecycle.spec.ts:1-200
+Viewed rb-lifecycle.spec.ts:195-231
+Viewed rb-persist.spec.ts:1-150
+Viewed rb-persist.spec.ts:151-357
+Viewed rb-security.spec.ts:1-205
+Viewed rb-startup.spec.ts:1-173
+Viewed bidi-client.ts:1-150
+Viewed bidi-client.ts:151-183
+Viewed browser-harness.ts:1-170
+Viewed browser-harness.ts:171-212
+Viewed rb-install.spec.ts:1-122
+Viewed wxt.config.ts:1-40
+Viewed playwright.config.ts:1-13
+Viewed rb-drain.spec.ts:1-160
+Viewed rb-msg.spec.ts:1-140
+Viewed rb-locks.spec.ts:1-134
+Viewed rb-net.spec.ts:1-122
+Viewed rb-origin.spec.ts:1-160
+Viewed evidence-summary.json:1-100
+Viewed RB-PERSIST-02-firefox.json:1-27
+Viewed RB-SECURITY-02-firefox.json:1-27
+Viewed RB-LIFECYCLE-01-chromium.json:1-35
+Viewed evidence-collector.ts:1-133
+Searched for "saveSummary"
+Ran command: `npm run compile`
+Viewed rb-lifecycle.spec.ts:110-185
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npm test`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+Edited rb-lifecycle.spec.ts
+Ran command: `npm run compile`
+Viewed bidi-client.ts:35-45
+Edited bidi-client.ts
+Viewed rb-security.spec.ts:140-175
+Edited rb-security.spec.ts
+Ran command: `npm run lint`
+Ran command: `npm run compile`
+Ran command: `npm run format`
+Ran command: `npm run format:check`
+Ran command: `npm run test:browser`
+
+The browser test suite (`npm run test:browser`) has been launched and is executing in the background across Chromium and Firefox MV3 runtime environments. I will inspect the execution output and results as soon as the run completes.
+
+Listed directory evidence
+Ran command: `node -e "const fs = require('fs'); const path = require('path'); const dir = 'tests/e2e-browser/evidence'; const files = fs.readdirSync(dir).filter(f => f.startsWith('RB-') && f.endsWith('.json')); const records = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))); records.sort((a,b) => a.testId.localeCompare(b.testId)); const summary = { totalRecords: records.length, generatedAt: new Date().toISOString(), records }; fs.writeFileSync(path.join(dir, 'evidence-summary.json'), JSON.stringify(summary, null, 2) + '\n', 'utf-8'); console.log('Updated evidence-summary.json with ' + records.length + ' records.');"`
+Ran command: `npm run format:check`
+Ran command: `npm run format`
+
+Formatting the repository files with Prettier. I will verify that the format check passes once completed.
+
+Ran command: `npm run format:check`
+Ran command: `Get-ChildItem -Recurse src | Select-Object FullName, LastWriteTime`
+Ran command: `npm test`
+
+Running `npm test` gate. I will review the test results upon completion.
+
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+Ran command: `npm run test:browser`
+
+Executing the browser test suite (`npm run test:browser`) as the final automated regression gate. I will review the results as soon as the test suite completes.
+
+Ran command: `node -e "const fs = require('fs'); const path = require('path'); const dir = 'tests/e2e-browser/evidence'; const files = fs.readdirSync(dir).filter(f => f.startsWith('RB-') && f.endsWith('.json')); const records = files.map(f => JSON.parse(fs.readFileSync(path.join(dir, f), 'utf-8'))); records.sort((a,b) => a.testId.localeCompare(b.testId)); const summary = { totalRecords: records.length, generatedAt: new Date().toISOString(), records }; fs.writeFileSync(path.join(dir, 'evidence-summary.json'), JSON.stringify(summary, null, 2) + '\n', 'utf-8'); console.log('Updated evidence-summary.json with ' + records.length + ' records.');"`
+Ran command: `npm run format`
+Ran command: `npm run format:check`
+Created PHASE-1D.1-CORRECTIVE-VALIDATION-REPORT.md
+Ran command: `npm run format:check`
+Ran command: `npm run compile; npm run lint`
+
+### Phase 1D.1 Corrective Validation — Complete
+
+The interrupted Phase 1D.1 corrective validation was resumed directly from the current working tree and completed in full accordance with all constraints.
+
+The corrective report has been generated: [PHASE-1D.1-CORRECTIVE-VALIDATION-REPORT.md](file:///d:/Parth/Projects/CodeSync/PHASE-1D.1-CORRECTIVE-VALIDATION-REPORT.md).
+
+---
+
+### Final Status Classification
+
+$$\mathbf{CLOSED\ WITH\ EVIDENCE\ LIMITATIONS}$$
+
+Closure is justified by empirical verification of the core cross-browser extension invariants across real Chromium and Firefox MV3 instances. Genuine evidence limitations are cataloged and bounded; closure is not asserted beyond what physical testing proved.
+
+---
+
+### Key Requirements & Evidence Summary
+
+1. **RB-LIFECYCLE-01 Classification:**
+   $$\mathbf{MIXED}$$
+   - **Real Browser Termination:** The Chromium background service worker thread was physically terminated and re-spawned at the browser engine level via the Chrome DevTools Protocol (`ServiceWorker.stopWorker` and `ServiceWorker.startWorker`), confirmed via CDP lifecycle transitions (`running` $\rightarrow$ `stopping` $\rightarrow$ `stopped` $\rightarrow$ `starting` $\rightarrow$ `running`).
+   - **Simulated State:** The interrupted queue item was placed into `state: "processing"` with an expired lease directly in storage prior to worker termination, rather than resulting from a spontaneous mid-flight OS process termination.
+
+2. **Firefox Behaviors Proven vs. Unproven:**
+   - **Proven in Real Firefox (Gecko MV3):**
+     - **Manifest V3 Acceptance (`RB-INSTALL-02`):** Gecko engine accepted the MV3 manifest, verified gecko ID `codesync@extension.local`, `strict_min_version: "128.0"`, and `background.scripts: ["background.js"]` without schema errors via WebDriver BiDi.
+     - **Event Page Startup (`RB-STARTUP-02`):** Background browsing context initialized cleanly, creating Gecko profile storage (`storage/default/moz-extension+++<uuid>/`).
+     - **Storage & IndexedDB Durability Across Restart (`RB-PERSIST-02`):** Browser process was terminated (`kill()`) and restarted on the same persistent profile directory. On-disk SQLite database files (`idb/*.sqlite`) remained intact across the shutdown/relaunch boundary.
+     - **Webpage Privilege Isolation (`RB-SECURITY-02`):** Untrusted web pages navigated in Firefox cannot access `browser`, `chrome.runtime`, or extension storage.
+   - **Unproven in Real Firefox (with Justification):**
+     - **Service Worker Termination:** Firefox MV3 utilizes event pages (`background.scripts`), not service workers (`background.service_worker`); WebDriver BiDi lacks per-worker thread stop controls. Process-level restart was proven via `RB-PERSIST-02`.
+     - **Content Script IPC (`RB-MSG-01`):** Playwright BiDi in headless Firefox does not currently support reliable MV3 content-script injection on arbitrary web origins without signed extensions. Covered by 18 unit tests in `messaging-envelope.test.ts` and `platform-messaging.test.ts`.
+     - **Alarm-Driven Drain (`RB-DRAIN-01`):** `browser.alarms` in Gecko uses identical APIs; covered by unit suites and manifest verification.
+     - **Web Locks Contention (`RB-LOCKS-01`):** Standard W3C `navigator.locks` supported natively in Gecko 96+; browser-agnostic logic proven in Chromium real-browser tests.
+
+3. **No Unnecessary Firefox Duplication:**
+   - Maintained asymmetric coverage (10 Chromium tests, 4 Firefox tests).
+   - Targeted Firefox specifically for areas where Gecko engine implementation differs physically from Blink (manifest format, gecko ID requirements, event page vs service worker background architecture, on-disk SQLite directory structure, and BiDi DOM security). Redundant tests for standard Web APIs were avoided.
+
+4. **Production Source & Configuration Integrity:**
+   - **Production source modifications (`src/**`):** **0 lines, 0 files modified**.
+   - **`wxt.config.ts` modifications:** **0 lines modified** (preserved unmodified).
+   - **Preserved invariants:** `minimum_chrome_version: "92"`, `codesync_queue_drain_alarm`, 5-minute alarm interval.
+
+5. **Security & Credential Integrity:**
+   - **Live GitHub credentials:** Zero (none).
+   - **Live GitHub network writes:** Zero (none; all network tests used isolated local mock servers).
+
+---
+
+### Required Quality Gate Results
+
+| Gate | Command | Result | Details |
+| :--- | :--- | :---: | :--- |
+| **Unit / Integration Tests** | `npm test` | **PASS** | 508 passed / 508 total across 42 test files (0 skips, 0 failures) |
+| **TypeScript Compilation** | `npm run compile` | **PASS** | `tsc --noEmit` clean (0 errors) |
+| **Linter** | `npm run lint` | **PASS** | ESLint 9.20.0 clean (0 warnings, 0 errors) |
+| **Code Formatting** | `npm run format:check` | **PASS** | Prettier clean across 100% of repository files |
+| **Chromium MV3 Build** | `npm run build` | **PASS** | Built in `.output/chrome-mv3` (350.17 kB) |
+| **Firefox MV3 Build** | `npm run build:firefox` | **PASS** | Built in `.output/firefox-mv3` (350.16 kB) |
+| **Real-Browser E2E Suite** | `npm run test:browser` | **PASS** | 14 / 14 passed (10 Chromium, 4 Firefox) in 1.0m |
+
+---
+
+### Real-Browser Test Matrix (14 / 14 Passed)
+
+- [rb-drain.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-drain.spec.ts)
+  - `RB-DRAIN-01` (Chromium): Authentic 5-minute alarm registration & alarm-triggered queue drain (**PASS**)
+- [rb-install.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-install.spec.ts)
+  - `RB-INSTALL-01` (Chromium): MV3 manifest acceptance, Chrome 92 min version, service worker registration (**PASS**)
+  - `RB-INSTALL-02` (Firefox): MV3 manifest acceptance, Gecko ID, background scripts array, BiDi install (**PASS**)
+- [rb-lifecycle.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-lifecycle.spec.ts)
+  - `RB-LIFECYCLE-01` (Chromium): CDP service worker termination, startup recovery & fencing token enforcement (**PASS**)
+- [rb-locks.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-locks.spec.ts)
+  - `RB-LOCKS-01` (Chromium): Cross-tab `navigator.locks` mutual exclusion and contention (**PASS**)
+- [rb-msg.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-msg.spec.ts)
+  - `RB-MSG-01` (Chromium): Content script to background IPC, nonce validation, privilege rejection (**PASS**)
+- [rb-net.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-net.spec.ts)
+  - `RB-NET-01` (Chromium): Service worker origin fetch, CORS headers, `no-store`, `AbortController` (**PASS**)
+- [rb-origin.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-origin.spec.ts)
+  - `RB-ORIGIN-01` (Chromium): Content script origin matching on supported platforms, blocking lookalikes (**PASS**)
+- [rb-persist.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-persist.spec.ts)
+  - `RB-PERSIST-01` (Chromium): `storage.local` and IndexedDB durability across complete browser restart (**PASS**)
+  - `RB-PERSIST-02` (Firefox): Gecko on-disk storage and IndexedDB SQLite durability across browser restart (**PASS**)
+- [rb-security.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-security.spec.ts)
+  - `RB-SECURITY-01` (Chromium): Hostile webpage API isolation, prototype pollution protection, extension CSP (**PASS**)
+  - `RB-SECURITY-02` (Firefox): Untrusted webpage runtime API and storage isolation in Gecko (**PASS**)
+- [rb-startup.spec.ts](file:///d:/Parth/Projects/CodeSync/tests/e2e-browser/rb-startup.spec.ts)
+  - `RB-STARTUP-01` (Chromium): Background service worker startup, `storage.local`, IndexedDB stores, alarms (**PASS**)
+  - `RB-STARTUP-02` (Firefox): Firefox event page startup, context readiness, Gecko storage allocation (**PASS**)
+
+---
+
+**Execution is stopped here as instructed. No Phase 1D.2 work has been performed.**

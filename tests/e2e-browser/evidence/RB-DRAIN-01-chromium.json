@@ -1,0 +1,24 @@
+{
+  "testId": "RB-DRAIN-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:21:56.039Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "alarmName": "codesync_queue_drain_alarm",
+    "alarmPeriodInMinutes": 5,
+    "hasAlarmListener": true,
+    "queueStateAfterDrain": "requires_attention"
+  },
+  "relevantStorageState": {
+    "alarmDrainProcessed": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "ALARM_CONFIGURATION_5_MINUTES_AUTHORITATIVE",
+    "ALARM_DISPATCH_TRIGGERS_BACKGROUND_DRAIN",
+    "QUEUEDRAINER_INVOKED_ON_ALARM"
+  ]
+}

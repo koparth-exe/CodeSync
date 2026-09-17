@@ -1,0 +1,163 @@
+# Phase 1C.4.3.3.2 Implementation Report
+
+## 1. Executive Summary
+
+This report documents the implementation and validation results of **Phase 1C.4.3.3.2 — Token Lifecycle Coordinated Force-Refresh Production Corrections**.
+
+The primary objective of this phase was to correct the confirmed production defect **DEFECT-1C.4.3.3.1-01** discovered in Phase 1C.4.3.3.1:
+- Production file: `src/shared/auth/token-lifecycle.ts`
+- Affected functions: `getValidAccessToken(...)`, `executeCoordinatedRefresh(...)`
+
+The defect caused `getValidAccessToken({ forceRefresh: true })` to lose the caller's force-refresh intent upon calling `executeCoordinatedRefresh()`. Under the Web Lock, `executeCoordinatedRefresh()` observed that `timeRemaining > preFlightBufferMs` and incorrectly returned `{ alreadyRefreshed: true, token: currentAuth.accessToken }` without contacting the OAuth refresh endpoint. This resulted in retrying the identical server-rejected token, triggering a second HTTP 401 and an improper quarantine.
+
+The minimal production correction has restored the intended behavior:
+- Coordinated forced refresh strictly verifies whether an actual credential-generation increment occurred (`currentAuth.refreshGeneration > knownGeneration`) before treating an existing token as "already refreshed".
+- Locally unexpired TTL alone is no longer treated as evidence of a successful concurrent refresh when `forceRefresh: true` is requested.
+- Under-lock checks fail closed immediately if another concurrent worker transitioned authentication state to `unauthenticated`, `reauth_required`, or `reconciliation_required`.
+- Concurrent refresh coordination, Web Locks, persistent refresh lease fencing, monotonic generation increments ($G \to G + 1$), and single API retry bounds are preserved.
+
+---
+
+## 2. Phase Status & Metrics
+
+- **Phase**: 1C.4.3.3.2
+- **Status**: **APPROVED**
+- **Defect Fixed**: DEFECT-1C.4.3.3.1-01
+- **Production Files Modified**:
+  - `src/shared/auth/token-lifecycle.ts` (ONLY file modified in `src/**`)
+- **Test Files Modified**:
+  - `tests/security/token-lifecycle.test.ts` (added `AUTH-FORCE-01` through `AUTH-FORCE-08`)
+- **Documentation Created**:
+  - `docs/Phase 1C.4.3.3.2 Implementation Report.txt`
+- **Total Tests**: 494 tests across 39 test files
+- **Test Results**: 494 passed, 0 failed, 0 skipped
+- **Scope Compliance**: COMPLIANT (strictly minimal production fix for DEFECT-1C.4.3.3.1-01 and 8 focused regression tests)
+
+---
+
+## 3. Root Cause Analysis (DEFECT-1C.4.3.3.1-01)
+
+In `src/shared/auth/token-lifecycle.ts`:
+1. When `getValidAccessToken({ forceRefresh: true })` was invoked, line 149 bypassed the fast-path check because `!options?.forceRefresh` evaluated to `false`.
+2. However, at line 158, `getValidAccessToken` invoked `this.executeCoordinatedRefresh(options?.workerId)`. The `forceRefresh: true` flag and the caller's observed generation (`currentAuth.refreshGeneration`) were discarded.
+3. Inside `executeCoordinatedRefresh`, under the Web Lock (`withWebLock`), lines 178–188 evaluated:
+   ```typescript
+   const timeRemaining = currentAuth.tokenExpiresAt - now;
+   if (
+     currentAuth.status === "authenticated" &&
+     timeRemaining > this.preFlightBufferMs &&
+     currentAuth.refreshState === "IDLE"
+   ) {
+     return { alreadyRefreshed: true, token: currentAuth.accessToken };
+   }
+   ```
+4. If a token was revoked, invalidated, or rejected server-side by GitHub before local expiration, `timeRemaining > this.preFlightBufferMs` was still `true`.
+5. Consequently, `executeCoordinatedRefresh` mistook local unexpired TTL for a concurrent refresh having already succeeded. The identical, invalid token was returned.
+6. In `GitHubApiClient.request()`, the single retry executed with the same invalid token, received a second 401, and quarantined the queue item. In addition, if a refresh token was revoked remotely (`bad_refresh_token`), the OAuth endpoint was never contacted and the state never transitioned to `reauth_required`.
+
+---
+
+## 4. Production Correction
+
+The minimal, concurrency-safe correction was implemented strictly in `src/shared/auth/token-lifecycle.ts`:
+
+1. **Propagation of Caller Intent & Generation Context**:
+   - `getValidAccessToken` accepts `options?: { forceRefresh?: boolean | undefined; workerId?: string | undefined; knownGeneration?: number | undefined }`.
+   - `getValidAccessToken` captures `knownGeneration = options?.knownGeneration ?? currentAuth.refreshGeneration`.
+   - `getValidAccessToken` passes `{ workerId: options?.workerId, forceRefresh: options?.forceRefresh, knownGeneration }` to `executeCoordinatedRefresh`.
+
+2. **Under-Lock Auth State Validation**:
+   - Inside `withWebLock`, `executeCoordinatedRefresh` checks whether `currentAuth.status` transitioned to `unauthenticated`, `reauth_required`, or `reconciliation_required` while awaiting lock acquisition, failing closed immediately.
+
+3. **Strict Generation-Based "Already Refreshed" Predicate**:
+   - The condition to short-circuit a refresh now requires proof of an actual generation advancement when `forceRefresh: true`:
+     ```typescript
+     const isAlreadyRefreshed =
+       currentAuth.status === "authenticated" &&
+       timeRemaining > this.preFlightBufferMs &&
+       currentAuth.refreshState === "IDLE" &&
+       (!forceRefresh ||
+         (knownGeneration !== undefined &&
+           currentAuth.refreshGeneration > knownGeneration));
+     ```
+   - If `forceRefresh === true`, local TTL alone is never sufficient; a newer generation (`currentAuth.refreshGeneration > knownGeneration`) committed by another worker must be present.
+   - If no newer generation was committed, `isAlreadyRefreshed` is `false`, and the manager proceeds to claim the persistent refresh lease and dispatch an outbound refresh request to the GitHub OAuth endpoint.
+
+---
+
+## 5. Concurrency & Security Audit
+
+The 12-point concurrency and security audit was performed:
+
+1. **Single-Worker Forced Refresh**: Verified by `AUTH-FORCE-01` and `FAIL-MAT-01`. A locally unexpired token rejected with 401 triggers forced refresh, contacts OAuth endpoint, increments `refreshGeneration` ($G \to G+1$), and succeeds on single retry.
+2. **Single-Worker Refresh Failure**: Verified by `AUTH-FORCE-06` and `FAIL-MAT-02`. 401 followed by OAuth `bad_refresh_token` transitions durable auth state to `reauth_required`, quarantines item into `requires_attention`, and dispatches zero PUTs.
+3. **Concurrent 401s**: Verified by `AUTH-FORCE-03`. Multiple workers receiving 401 coordinate via Web Locks and persistent lease. Worker A acquires the lease; Worker B receives `LEASE_SUPERSEDED` and cannot start an unauthorized competing refresh. Zero refresh storm.
+4. **Genuine Concurrent Refresh**: Verified by `AUTH-FORCE-02` and `AUTH-FORCE-03`. If Worker B commits generation $N+1$ while Worker A waited or after Worker A observed generation $N$, Worker A adopts Worker B's token without executing an unnecessary second refresh.
+5. **Stale Worker Protection**: Verified by `AUTH-FORCE-04`. Stale Worker A cannot overwrite newer credential generation committed by Worker B. Fencing predicate drops stale responses.
+6. **Lease Takeover**: Verified by `AUTH-FORCE-04` and existing `AUTH-22..24`. When a worker's lease expires, a successor worker safely takes over with incremented lease epoch ($E \to E+1$).
+7. **Refresh-Token Rotation**: Verified by `AUTH-FORCE-05`. Rotated refresh token in generation $N+1$ is durably committed; stale worker responses cannot regress it.
+8. **Refresh Failure Persistence**: Verified by `AUTH-FORCE-06`. `reauth_required` state is durable in `browser.storage.local`; subsequent calls fail closed without hitting network.
+9. **Worker Restart**: Verified across existing and pipeline test suites. All lease, generation, attempt, and token states are read from durable storage; zero in-memory-only state assumptions.
+10. **Force Refresh + Valid Local TTL**: Verified by `AUTH-FORCE-01`. Unexpired local TTL does not prevent forced refresh when `forceRefresh: true` is requested.
+11. **Normal Non-Force Path**: Verified by `AUTH-FORCE-07`. Fast path returns valid unexpired token immediately without storage writes or Web Lock overhead.
+12. **401 Retry Bound**: Verified by `AUTH-FORCE-08`. `GitHubApiClient` strictly bounds retry to at most 1 attempt. Second 401 terminates immediately with `GITHUB_UNAUTHORIZED`; zero recursive loops.
+
+---
+
+## 6. Test Results Summary
+
+### Failure Matrix Integration Suite (tests/security/pipeline-e2e.test.ts)
+- **`FAIL-MAT-01`**: **PASS** (401 triggers coordinated forced refresh, increments generation 1 → 2, retry succeeds, item completed)
+- **`FAIL-MAT-02`**: **PASS** (401 with revoked refresh token transitions auth to `reauth_required`, item quarantined into `requires_attention`, 0 PUTs)
+- **`FAIL-MAT-03`**: **PASS** (403 authorization denial immediately quarantined without retry)
+- **`FAIL-MAT-04`**: **PASS** (Pre-flight GET transport failure schedules clean backoff without uncertain write reconciliation)
+- **`FAIL-MAT-05`**: **PASS** (Post-write verification content mismatch transitions to attention/quarantine)
+- **`FAIL-MAT-06`**: **PASS** (Pre-flight GET 5xx classifies as retryable failure without uncertain write reconciliation)
+
+### Focused Regression Suite (tests/security/token-lifecycle.test.ts)
+- **`AUTH-FORCE-01`**: **PASS** (Locally unexpired access token force-refreshed when `forceRefresh=true`)
+- **`AUTH-FORCE-02`**: **PASS** (Genuine newer generation satisfies force-refresh without second refresh)
+- **`AUTH-FORCE-03`**: **PASS** (Concurrent forced refresh requests do not create refresh storm; active lease rejected with `LEASE_SUPERSEDED`)
+- **`AUTH-FORCE-04`**: **PASS** (Stale worker cannot overwrite newer credential generation)
+- **`AUTH-FORCE-05`**: **PASS** (Refresh-token rotation remains durable and stale workers cannot regress it)
+- **`AUTH-FORCE-06`**: **PASS** (Failed forced refresh transitions to `reauth_required` and remains durable)
+- **`AUTH-FORCE-07`**: **PASS** (Normal non-force token acquisition still uses valid-token fast path)
+- **`AUTH-FORCE-08`**: **PASS** (401 → forced refresh → retry remains bounded to single API retry)
+
+### Full Test Suite Regression
+- Total Tests: **494 passed** (0 failed, 0 skipped) across 39 test files.
+- Baseline 480 tests + 6 FAIL-MAT tests + 8 AUTH-FORCE tests = 494 tests. Zero regressions.
+
+---
+
+## 7. Quality & Validation Gates
+
+- **TypeScript Compilation (`npm run compile`)**: **PASS** (0 errors)
+- **ESLint (`npm run lint`)**: **PASS** (0 errors, 0 warnings)
+- **Prettier Code Style (`npm run format:check`)**: **PASS** (All files formatted)
+- **Vitest Full Suite (`npm test`)**: **PASS** (494 / 494 tests passing)
+- **Chrome MV3 Build (`npm run build`)**: **PASS** (0 errors, output in `.output/chrome-mv3`)
+- **Firefox MV3 Build (`npm run build:firefox`)**: **PASS** (0 errors, output in `.output/firefox-mv3`)
+
+---
+
+## 8. Security Invariants Confirmation
+
+All existing security and concurrency invariants remain strictly preserved:
+- Web Locks coordinate refresh operations.
+- Persistent refresh lease remains authoritative across worker lifetimes.
+- `refreshGeneration` increases monotonically only on authoritative credential commit.
+- Stale workers cannot mutate newer credential state.
+- Credential-state commits remain fenced with 6-point predicate.
+- Lease expiry revokes local mutation authority.
+- Refresh-token rotation remains safe and durable.
+- Fail-closed behavior is maintained across all error paths.
+
+---
+
+## 9. Conclusion & Next Phase
+
+Phase 1C.4.3.3.2 is **APPROVED**. DEFECT-1C.4.3.3.1-01 is completely and authoritatively resolved with full test validation and zero architectural or regression issues.
+
+Next Phase:
+**Phase 1C.4.3.4 — Queue Concurrency & Parallel Drain Hardening** (or designated closure/next sub-phase per roadmap).

@@ -1,0 +1,212 @@
+# Phase 1C.4.3.3.1 Implementation Report
+
+## 1. Executive Summary
+
+This report documents the implementation and validation results of **Phase 1C.4.3.3.1 — Retry / Rate-Limit / Failure Matrix: Targeted Integration Tests**.
+
+The objective of this phase was to implement exclusively the six targeted integration tests identified by the approved Phase 1C.4.3.3.0 audit:
+1. **`FAIL-MAT-01`**: 401 → coordinated token refresh → retry success
+2. **`FAIL-MAT-02`**: 401 → refresh token revoked/fails → quarantine
+3. **`FAIL-MAT-03`**: 403 authorization denial → immediate quarantine
+4. **`FAIL-MAT-04`**: Pre-flight GET transport disconnect → clean backoff
+5. **`FAIL-MAT-05`**: Post-write verification content mismatch → quarantine
+6. **`FAIL-MAT-06`**: Pre-flight GET 5xx → retryable failure
+
+### Scope & Production Change Posture
+- Expected Production Code Changes: **0**
+- Actual Production Code Changes: **0** (strictly preserved; zero files modified in `src/**`)
+- Test Files Modified:
+  - [`tests/helpers/mock-github-api.ts`](file:///d:/Parth/Projects/CodeSync/tests/helpers/mock-github-api.ts)
+  - [`tests/helpers/e2e-harness.ts`](file:///d:/Parth/Projects/CodeSync/tests/helpers/e2e-harness.ts)
+  - [`tests/security/pipeline-e2e.test.ts`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts)
+
+### Core Result & Critical Finding
+Execution of the six targeted integration tests against the current production codebase validated four failure-matrix scenarios and conclusively exposed one confirmed production defect in the authentication token lifecycle manager:
+- **`FAIL-MAT-03`**: **PASSED** (403 without rate limit headers is classified as authorization denial and immediately quarantined without retry or backoff loops; 0 PUTs).
+- **`FAIL-MAT-04`**: **PASSED** (Pre-flight GET transport disconnect schedules durable backoff without entering uncertain-write reconciliation; skips early drain; retries and completes on timer expiry; 1 PUT total).
+- **`FAIL-MAT-05`**: **PASSED** (Post-write verification content mismatch quarantines item with `GITHUB_VERIFICATION_FAILED`; does not falsely report success in history; prevents blind duplicate PUTs).
+- **`FAIL-MAT-06`**: **PASSED** (Pre-flight GET 5xx classifies as retryable failure without uncertain-write reconciliation; schedules durable backoff; retries and completes on subsequent drain).
+- **`FAIL-MAT-01`**: **FAILED (Production Defect Exposed)**: In [`src/shared/auth/token-lifecycle.ts:158,178-188`](file:///d:/Parth/Projects/CodeSync/src/shared/auth/token-lifecycle.ts#L158-L188), when `getValidAccessToken({ forceRefresh: true })` is invoked following an initial HTTP 401 Unauthorized response from GitHub, `executeCoordinatedRefresh` checks `timeRemaining > this.preFlightBufferMs && currentAuth.refreshState === "IDLE"`. Because `forceRefresh` intent is discarded, `executeCoordinatedRefresh` falsely assumes another concurrent worker already refreshed the token, returns the identical 401-rejected token without contacting the OAuth refresh endpoint, and causes the retried operation to immediately fail with a second terminal 401.
+- **`FAIL-MAT-02`**: **FAILED (Production Defect Exposed)**: Due to the exact same defect in [`src/shared/auth/token-lifecycle.ts:178-188`](file:///d:/Parth/Projects/CodeSync/src/shared/auth/token-lifecycle.ts#L178-L188), when GitHub returns HTTP 401, `executeCoordinatedRefresh` bypasses outbound token refresh completely for any locally unexpired token TTL. Consequently, the OAuth endpoint is never contacted, the revoked refresh token (`bad_refresh_token`) is never evaluated, the durable auth state never transitions to `"reauth_required"`, and the queue item fails with `GITHUB_UNAUTHORIZED` instead of discovering the revoked credential.
+
+In accordance with the **Strict Stop-on-Production-Defect Policy**, execution was halted immediately upon establishing the defect, zero production fixes were applied, and evidence has been preserved.
+
+---
+
+## 2. Phase Status & Metrics
+
+- **Phase**: 1C.4.3.3.1
+- **Status**: **STOPPED — PRODUCTION DEFECT DETECTED**
+- **Baseline Test Count**: 480 / 480 passed (39 test files)
+- **Final Test Count**: 484 passed, 2 failed (486 total across 39 test files)
+- **Production Files Modified**: **NONE** (`src/**` remains untouched)
+- **Test Files Modified**: 3 files
+- **Scope Compliance**: COMPLIANT (strictly 6 targeted tests implemented, zero scope creep)
+
+---
+
+## 3. Detailed Results for Authorized Tests
+
+### FAIL-MAT-01: 401 → Coordinated Token Refresh → Retry Success
+- **Scenario**: A queue item is eligible for synchronization. The initial request to GitHub (`getRepository`) receives HTTP 401 Bad credentials. The client is expected to invoke coordinated token refresh via `DurableTokenLifecycleManager`, obtain a refreshed access token, retry the operation exactly once, and complete the queue item.
+- **Result**: **FAILED** (Exposes production defect in `src/shared/auth/token-lifecycle.ts`)
+- **Key Assertions**:
+  - `drainSummary.completed === 1`: Received 0 (quarantined: 1)
+  - `oauthFetchMock called 1 time`: Received 0 times (refresh POST was never dispatched)
+  - `item.state === QueueState.COMPLETED`: Received `requires_attention`
+  - `authState.refreshGeneration === 2`: Received 1 (unmodified)
+- **Diagnostic Finding**: `executeCoordinatedRefresh` in `src/shared/auth/token-lifecycle.ts` checks `timeRemaining > this.preFlightBufferMs` under the Web Lock and returns `{ alreadyRefreshed: true, token: currentAuth.accessToken }`, completely ignoring `forceRefresh: true`.
+
+### FAIL-MAT-02: 401 → Refresh Token Revoked/Fails → Quarantine
+- **Scenario**: Initial GitHub request receives HTTP 401. Production client invokes coordinated refresh. The OAuth refresh endpoint rejects the request with `{ error: "bad_refresh_token" }`. The operation must fail closed, transition the queue item to `requires_attention` (`GITHUB_AUTH_REQUIRED` / `GITHUB_UNAUTHORIZED`), transition durable auth state to `reauth_required`, and issue 0 PUT requests.
+- **Result**: **FAILED** (Exposes production defect in `src/shared/auth/token-lifecycle.ts`)
+- **Key Assertions**:
+  - `authState.status === "reauth_required"`: Received `"authenticated"` (OAuth endpoint was never contacted due to refresh suppression)
+  - `oauthFetchMock called 1 time`: Received 0 times
+  - `getPutCount() === 0`: PASSED (0 PUTs dispatched)
+  - `item.attempts === 0`: PASSED (quarantined without incrementing retry attempts)
+- **Diagnostic Finding**: Directly caused by the defect documented in FAIL-MAT-01; because `executeCoordinatedRefresh` suppressed outbound refresh dispatch, the revocation error was never received or persisted.
+
+### FAIL-MAT-03: 403 Authorization Denial → Immediate Quarantine
+- **Scenario**: Pre-flight GitHub request receives HTTP 403 Forbidden without rate-limit indicators (`x-ratelimit-remaining: 0` or `Retry-After`). Verifies that the production pipeline classifies this as an authorization failure rather than transient rate limiting.
+- **Result**: **PASSED**
+- **Key Assertions**:
+  - `item.state === QueueState.REQUIRES_ATTENTION`: PASSED
+  - `item.lastError.code === ErrorCode.GITHUB_FORBIDDEN`: PASSED
+  - `item.attempts === 0`: PASSED (no transient retry increment)
+  - `item.nextRetryAt === undefined`: PASSED (no backoff scheduled)
+  - `getPutCount() === 0`: PASSED (pre-write authorization denial dispatches zero PUTs)
+  - Trace: `GET_AUTH_403`, no `PUT_FILE`: PASSED
+  - History entries: 0: PASSED
+  - Subsequent drain skips quarantined item: PASSED
+
+### FAIL-MAT-04: Pre-flight GET Transport Disconnect → Clean Backoff
+- **Scenario**: A network drop / transport failure occurs during the pre-flight GET (`/contents/...`) before any write is dispatched. Verifies that the failure is classified as retryable backoff and distinctly NOT as an uncertain write reconciliation.
+- **Result**: **PASSED**
+- **Key Assertions**:
+  - Attempt 1 `item.state === QueueState.FAILED`: PASSED
+  - Attempt 1 `item.attempts === 1`: PASSED
+  - Attempt 1 `item.nextRetryAt > startTime`: PASSED
+  - Attempt 1 `getPutCount() === 0`: PASSED
+  - Attempt 1 Trace includes `GET_FILE_NETWORK_FAILURE`, no `PUT_FILE`: PASSED
+  - Drain before `nextRetryAt` skips: PASSED (`processed === 0`)
+  - Drain after `nextRetryAt` retries and completes: PASSED (`completed === 1`, `state === COMPLETED`)
+  - Final PUT count is exactly 1: PASSED
+  - History entry status is `"synced"`: PASSED
+
+### FAIL-MAT-05: Post-Write Verification Content Mismatch → Quarantine
+- **Scenario**: Pre-flight validation succeeds and GitHub PUT succeeds (commit/blob SHA generated). However, the post-write verification GET returns content whose content hash does not match the expected local content hash. Verifies that CodeSync does not declare success merely because PUT succeeded.
+- **Result**: **PASSED**
+- **Key Assertions**:
+  - `item.state === QueueState.REQUIRES_ATTENTION`: PASSED
+  - `item.lastError.code === "GITHUB_VERIFICATION_FAILED"`: PASSED
+  - `item.nextRetryAt === undefined`: PASSED
+  - `getPutCount() === 1`: PASSED (write executed, but verification failed)
+  - Zero duplicate blind PUTs issued: PASSED
+  - History entries: 0 (not marked as synced): PASSED
+  - Subsequent drain skips quarantined item: PASSED
+
+### FAIL-MAT-06: Pre-flight GET 5xx → Retryable Failure
+- **Scenario**: Pre-flight GET receives an HTTP 500 Internal Server Error. Verifies that server 5xx is treated as a transient retryable failure rather than authorization failure or uncertain write.
+- **Result**: **PASSED**
+- **Key Assertions**:
+  - Attempt 1 `item.state === QueueState.FAILED`: PASSED
+  - Attempt 1 `item.attempts === 1`: PASSED
+  - Attempt 1 `item.nextRetryAt > startTime`: PASSED
+  - Attempt 1 `getPutCount() === 0`: PASSED
+  - Attempt 1 Trace shows `GET_SERVER_ERROR_500`, no `PUT_FILE`: PASSED
+  - Drain before `nextRetryAt` skips: PASSED
+  - Drain after `nextRetryAt` retries and completes: PASSED (`completed === 1`, `state === COMPLETED`)
+  - Final PUT count is exactly 1: PASSED
+  - History entry status is `"synced"`, `commitSha` defined: PASSED
+
+---
+
+## 4. Formal Defect Report: DEFECT-1C.4.3.3.1-01
+
+### 1. Exact Failing Tests
+- `FAIL-MAT-01`: 401 triggers coordinated token refresh and succeeds on single retry
+- `FAIL-MAT-02`: 401 with revoked/failing refresh token fails closed into quarantine
+
+### 2. Exact Production File & Functions Involved
+- **File**: [`src/shared/auth/token-lifecycle.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/auth/token-lifecycle.ts)
+- **Functions**:
+  - `getValidAccessToken(options?: { forceRefresh?: boolean; workerId?: string })` (lines 113–160)
+  - `executeCoordinatedRefresh(workerIdParam?: string)` (lines 164–270)
+
+### 3. Observed Behavior
+When `getValidAccessToken({ forceRefresh: true })` is called for an authentication credential whose locally persisted `tokenExpiresAt` is in the future (`timeRemaining > this.preFlightBufferMs`):
+1. `getValidAccessToken` checks `!options?.forceRefresh` on line 149 and bypasses the fast-path check.
+2. `getValidAccessToken` invokes `this.executeCoordinatedRefresh(options?.workerId)` on line 158. Notice that `forceRefresh: true` is **not** passed as an argument.
+3. Inside `executeCoordinatedRefresh`, under the Web Lock on lines 178–188:
+   ```ts
+   const timeRemaining = currentAuth.tokenExpiresAt - now;
+   if (
+     currentAuth.status === "authenticated" &&
+     timeRemaining > this.preFlightBufferMs &&
+     currentAuth.refreshState === "IDLE"
+   ) {
+     return {
+       alreadyRefreshed: true as const,
+       token: currentAuth.accessToken,
+     };
+   }
+   ```
+4. `executeCoordinatedRefresh` checks whether `timeRemaining > this.preFlightBufferMs`. Because `tokenExpiresAt` is still in the future, this condition evaluates to `true`.
+5. `executeCoordinatedRefresh` concludes that another concurrent worker already refreshed the token (`alreadyRefreshed: true`).
+6. It returns the existing, un-refreshed `currentAuth.accessToken`.
+7. Outbound HTTP POST to `GITHUB_OAUTH_TOKEN_URL` is never dispatched (`fetchFn` call count is 0).
+8. `GitHubApiClient.request()` receives the identical 401-rejected token, executes its single retry with the same token, receives another 401, and fails terminally into quarantine.
+
+### 4. Expected Behavior
+When `forceRefresh: true` is explicitly passed to `getValidAccessToken` (which occurs when GitHub REST API returns HTTP 401 Unauthorized for an active request):
+1. `executeCoordinatedRefresh` must receive the `forceRefresh` intent (or track the initial generation of the caller).
+2. It must **not** assume the token was already refreshed simply because `timeRemaining > this.preFlightBufferMs`. (A token may be invalidated or revoked server-side by GitHub at any time while still possessing unelapsed local TTL).
+3. It must only consider the token `alreadyRefreshed` if a concurrent worker has actually committed a newer credential generation (`currentAuth.refreshGeneration > callerGeneration`).
+4. It must claim the persistent refresh lease, transition `refreshState` to `"REFRESHING"`, and dispatch the POST request to the OAuth refresh endpoint.
+
+### 5. Why This Is a Real Production Defect
+In GitHub's authorization architecture, access tokens can be invalidated, revoked, or expired server-side at any time prior to their nominal expiration (e.g., user revokes application in GitHub settings, admin security policy changes, token rotation on another device). When this happens, CodeSync's durable storage still has `tokenExpiresAt` set to a future timestamp.
+
+`GitHubApiClient.request()` correctly detects this condition via HTTP 401 and calls `this.getAccessToken(true)` to trigger the coordinated forced refresh. However, because `DurableTokenLifecycleManager` unconditionally checks `timeRemaining > preFlightBufferMs` inside `executeCoordinatedRefresh`, it completely short-circuits the refresh mechanism and returns the dead token.
+
+This permanently disables 401 token refresh recovery in production for all tokens revoked prior to local TTL expiration.
+
+### 6. Reproduction Path
+1. Seed `codesync:auth` storage with `status: "authenticated"`, `tokenExpiresAt: Date.now() + 3600_000`, `refreshState: "IDLE"`, `refreshGeneration: 1`.
+2. Configure mock GitHub API server to return HTTP 401 Bad credentials for the initial request.
+3. Enqueue a submission item and call `queueDrainer.drain("submission_event")`.
+4. Observe that `executeCoordinatedRefresh` returns `{ alreadyRefreshed: true }` without invoking `fetchFn`.
+5. Observe that `GitHubApiClient.request()` retries with the identical token, receives a second 401, and the queue item transitions to `requires_attention`.
+
+### 7. Harness / Helper Contribution Analysis
+The failure was not caused by any test helper or mock deficiency:
+- The test provided a valid `lifecycleManagerFactory` returning a real production `DurableTokenLifecycleManager`.
+- The mock OAuth token URL handler was never invoked because execution was halted inside `executeCoordinatedRefresh` before dispatch.
+- Zero production code was modified in this phase.
+
+---
+
+## 5. Validation Gates Status
+
+| Validation Gate | Status | Details |
+|---|---|---|
+| TypeScript Compilation (`npm run compile`) | **PASS** | 0 compilation errors across entire repository |
+| ESLint (`npm run lint`) | **PASS** | 0 lint warnings or errors |
+| Prettier (`npm run format:check`) | **PASS** | All files matched code style |
+| Full Vitest Suite (`npm test`) | **2 FAILED / 484 PASSED** | 480 baseline tests green; FAIL-MAT-03..06 green; FAIL-MAT-01, 02 exposed defect |
+| Chrome MV3 Build (`npm run build`) | **PASS** | Bundle compiled cleanly (349.38 kB) |
+| Firefox MV3 Build (`npm run build:firefox`) | **PASS** | Bundle compiled cleanly (349.38 kB) |
+
+---
+
+## 6. Conclusion & Recommended Next Step
+
+Phase 1C.4.3.3.1 successfully implemented all six authorized integrated failure-matrix tests. Four tests (`FAIL-MAT-03`, `FAIL-MAT-04`, `FAIL-MAT-05`, `FAIL-MAT-06`) passed completely, verifying non-rate-limit 403 quarantine, pre-flight GET transport backoff, post-write verification mismatch quarantine, and pre-flight GET 5xx retryability.
+
+Tests `FAIL-MAT-01` and `FAIL-MAT-02` conclusively exposed a real production defect in `DurableTokenLifecycleManager.executeCoordinatedRefresh` (`src/shared/auth/token-lifecycle.ts`).
+
+In compliance with the **Strict Stop-on-Production-Defect Policy**, no production code was modified. The phase is marked:
+**STOPPED — PRODUCTION DEFECT DETECTED**.
+
+Recommended next phase: **Phase 1C.4.3.3.2 — Token Lifecycle Coordinated Force-Refresh Production Corrections**.

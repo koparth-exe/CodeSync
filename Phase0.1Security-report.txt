@@ -1,0 +1,146 @@
+Listed directory CodeSync
+Listed directory docs
+Listed directory ADR
+Viewed Phase0.1-Report.txt:1-151
+Viewed SECURITY.md:1-290
+Viewed GITHUB-INTEGRATION.md:1-284
+Viewed ADR-0003-github-oauth-device-flow.md:1-59
+Viewed ADR-0004-layered-extraction-strategy.md:1-68
+Viewed ADR-0005-persistent-queue-storage.md:1-57
+Viewed COMPETITOR-ANALYSIS.md:1-154
+Viewed ARCHITECTURE.md:1-150
+Viewed ARCHITECTURE.md:151-300
+Viewed ARCHITECTURE.md:301-450
+Viewed ARCHITECTURE.md:451-576
+Viewed QUEUE-DESIGN.md:1-150
+Viewed QUEUE-DESIGN.md:151-304
+Viewed PATH-TEMPLATE-SPEC.md:1-150
+Viewed PATH-TEMPLATE-SPEC.md:151-250
+Viewed PLATFORM-ADAPTER-SPEC.md:1-150
+Viewed PLATFORM-ADAPTER-SPEC.md:151-263
+Viewed DATA-MODEL.md:1-150
+Viewed DATA-MODEL.md:151-300
+Viewed DATA-MODEL.md:301-388
+Viewed TESTING-STRATEGY.md:1-150
+Viewed TESTING-STRATEGY.md:151-307
+Viewed SRS.md:1-100
+Viewed SRS.md:101-200
+Viewed SRS.md:380-450
+Viewed PRIVACY.md:1-163
+Viewed BROWSER-COMPATIBILITY.md:1-150
+Viewed TECH-STACK.md:1-100
+Viewed TECH-STACK.md:101-245
+Viewed ROADMAP.md:1-150
+Viewed ADR-0006-path-template-engine.md:1-65
+Viewed ADR-0007-content-hashing-dedup.md:1-60
+Viewed ADR-0001-local-first-architecture.md:1-54
+Viewed ADR-0002-wxt-extension-framework.md:1-49
+Created SECURITY.md
+Created GITHUB-INTEGRATION.md
+Created QUEUE-DESIGN.md
+Created PATH-TEMPLATE-SPEC.md
+Created PLATFORM-ADAPTER-SPEC.md
+Created DATA-MODEL.md
+Created ARCHITECTURE.md
+Created SRS.md
+Created PRIVACY.md
+Created BROWSER-COMPATIBILITY.md
+Created TECH-STACK.md
+Created COMPETITOR-ANALYSIS.md
+Created TESTING-STRATEGY.md
+Viewed ROADMAP.md:1-60
+Viewed ROADMAP.md:61-120
+Created ROADMAP.md
+Created ADR-0003-github-oauth-device-flow.md
+Created ADR-0004-layered-extraction-strategy.md
+Created ADR-0005-persistent-queue-storage.md
+Created ADR-0006-path-template-engine.md
+Viewed README.md:1-77
+Created README.md
+Searched for "oauth app"
+Searched for "webRequest"
+Searched for ""tabs""
+Searched for "IndexedDB"
+Searched for "Codolio"
+Listed directory CodeSync
+Created Phase0.1-Report.txt
+Listed directory CodeSync
+
+# Phase 0.1 Security & Architecture Hardening Gate Complete
+
+The Phase 0.1 **Security & Architecture Hardening Gate** has been completed. All 21 audit areas have been addressed, verified for cross-document consistency, and incorporated into the workspace documentation.
+
+The comprehensive gate report has been written to [Phase0.1-Report.txt](file:///d:/Parth/Projects/CodeSync/Phase0.1-Report.txt).
+
+---
+
+### Summary of Architectural & Security Hardenings
+
+1. **Formal Threat Model (Scenarios A through Z)**:
+   - Established in [SECURITY.md](file:///d:/Parth/Projects/CodeSync/docs/SECURITY.md), identifying critical assets, trust boundaries (Zones 0, 1, and 2), and 26 attack scenarios with severity, defense-in-depth mitigations, and residual risks.
+   - Enforced boundary invariants: `WEBPAGE != TRUSTED` and `CONTENT SCRIPT != TRUSTED`.
+
+2. **Least-Privilege GitHub Authentication**:
+   - Replaced legacy OAuth App design with a **GitHub App** architecture utilizing the **OAuth Device Authorization Flow** for user-to-server tokens in [GITHUB-INTEGRATION.md](file:///d:/Parth/Projects/CodeSync/docs/GITHUB-INTEGRATION.md) and [ADR-0003](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0003-github-oauth-device-flow.md).
+   - Fine-grained repository permissions: `Contents: write` scoped strictly to user-selected repositories.
+   - 8-hour access token lifecycle with automatic 6-month refresh token rotation.
+   - Personal Access Tokens (PAT) demoted to an advanced/manual fallback with documented security risks.
+
+3. **10-Step Safe Write Pipeline & TOCTOU Defense**:
+   - Atomic 10-step write sequence in [GITHUB-INTEGRATION.md](file:///d:/Parth/Projects/CodeSync/docs/GITHUB-INTEGRATION.md) validating repository identity, branch existence, canonical paths, UTF-8 content, token freshness, remote SHA optimistic locks, duplicate hash policies, 409 conflict retries with backoff, and commit verification.
+
+4. **Hybrid Partitioned Storage Architecture**:
+   - Partitioned storage in [QUEUE-DESIGN.md](file:///d:/Parth/Projects/CodeSync/docs/QUEUE-DESIGN.md), [DATA-MODEL.md](file:///d:/Parth/Projects/CodeSync/docs/DATA-MODEL.md), and [ADR-0005](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0005-persistent-queue-storage.md):
+     - `browser.storage.local` (<1 MB): Settings, auth credentials, queue metadata, and distributed mutex locks.
+     - `IndexedDB` (`codesync_db`): Source code payloads (`QueueItemPayload`) and full sync history (`SyncHistoryEntry`), eliminating 10 MB quota exhaustion risks.
+
+5. **Hardened Path Canonicalization & Traversal Defense**:
+   - 8-step deterministic canonicalization pipeline in [PATH-TEMPLATE-SPEC.md](file:///d:/Parth/Projects/CodeSync/docs/PATH-TEMPLATE-SPEC.md) and [ADR-0006](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0006-path-template-engine.md).
+   - Defends against `../`, `..\`, multi-pass URL encoding (`%2e%2e%2f`), double-encoding (`%252e%252e%252f`), Unicode homoglyphs (NFKC normalization), null bytes (`\0`), Windows reserved names (`CON`, `PRN`, `AUX`, `NUL`), and base repository folder escapes.
+
+6. **Platform-Specific Extraction Safety Hierarchy**:
+   - Refined layered strategy in [PLATFORM-ADAPTER-SPEC.md](file:///d:/Parth/Projects/CodeSync/docs/PLATFORM-ADAPTER-SPEC.md) and [ADR-0004](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0004-layered-extraction-strategy.md) rejecting universal network interception claims.
+   - Tailored extraction for LeetCode (GraphQL API + Polling), Codeforces (Public REST API + Page Parse), CodeChef (API Observation + Detail API), and GeeksforGeeks (Payload Intercept + Editor Bridge).
+   - Codolio formally marked as deferred (portfolio aggregator, no online judge).
+   - Extraction confidence threshold enforced at 0.70; lower confidence fails closed into User-Assisted Recovery.
+
+7. **Fail-Closed Architecture Invariants**:
+   - Formally documented across [SECURITY.md](file:///d:/Parth/Projects/CodeSync/docs/SECURITY.md), [ARCHITECTURE.md](file:///d:/Parth/Projects/CodeSync/docs/ARCHITECTURE.md), and [SRS.md](file:///d:/Parth/Projects/CodeSync/docs/SRS.md): **`FAIL CLOSED > BEST-EFFORT WRITE`**.
+
+8. **Security Testing Strategy**:
+   - Expanded [TESTING-STRATEGY.md](file:///d:/Parth/Projects/CodeSync/docs/TESTING-STRATEGY.md) with 17 mandatory future security test suites (S1 through S17) covering traversal, XSS, token leakage, race conditions, and poison-pill isolation.
+
+9. **Factual Competitor Analysis**:
+   - Corrected inaccurate claims in [COMPETITOR-ANALYSIS.md](file:///d:/Parth/Projects/CodeSync/docs/COMPETITOR-ANALYSIS.md), focusing differentiation on verified architectural combinations (security-by-design, persistent queue reliability, safe write pipeline, path hardening, zero telemetry).
+
+10. **Zero-Code Verification**:
+    - **Confirmed**: Exactly **zero (0)** implementation files, `package.json`, or dependencies were created. Pure documentation gate.
+
+---
+
+### Documentation Files Modified
+- [SECURITY.md](file:///d:/Parth/Projects/CodeSync/docs/SECURITY.md)
+- [GITHUB-INTEGRATION.md](file:///d:/Parth/Projects/CodeSync/docs/GITHUB-INTEGRATION.md)
+- [QUEUE-DESIGN.md](file:///d:/Parth/Projects/CodeSync/docs/QUEUE-DESIGN.md)
+- [PATH-TEMPLATE-SPEC.md](file:///d:/Parth/Projects/CodeSync/docs/PATH-TEMPLATE-SPEC.md)
+- [PLATFORM-ADAPTER-SPEC.md](file:///d:/Parth/Projects/CodeSync/docs/PLATFORM-ADAPTER-SPEC.md)
+- [DATA-MODEL.md](file:///d:/Parth/Projects/CodeSync/docs/DATA-MODEL.md)
+- [ARCHITECTURE.md](file:///d:/Parth/Projects/CodeSync/docs/ARCHITECTURE.md)
+- [SRS.md](file:///d:/Parth/Projects/CodeSync/docs/SRS.md)
+- [PRIVACY.md](file:///d:/Parth/Projects/CodeSync/docs/PRIVACY.md)
+- [BROWSER-COMPATIBILITY.md](file:///d:/Parth/Projects/CodeSync/docs/BROWSER-COMPATIBILITY.md)
+- [TECH-STACK.md](file:///d:/Parth/Projects/CodeSync/docs/TECH-STACK.md)
+- [COMPETITOR-ANALYSIS.md](file:///d:/Parth/Projects/CodeSync/docs/COMPETITOR-ANALYSIS.md)
+- [TESTING-STRATEGY.md](file:///d:/Parth/Projects/CodeSync/docs/TESTING-STRATEGY.md)
+- [ROADMAP.md](file:///d:/Parth/Projects/CodeSync/docs/ROADMAP.md)
+- [README.md](file:///d:/Parth/Projects/CodeSync/README.md)
+- [ADR-0003](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0003-github-oauth-device-flow.md)
+- [ADR-0004](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0004-layered-extraction-strategy.md)
+- [ADR-0005](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0005-persistent-queue-storage.md)
+- [ADR-0006](file:///d:/Parth/Projects/CodeSync/docs/ADR/ADR-0006-path-template-engine.md)
+- [Phase0.1-Report.txt](file:///d:/Parth/Projects/CodeSync/Phase0.1-Report.txt)
+
+---
+
+### Next Step
+Per instructions, execution is **stopped**. No Phase 1 implementation has begun. Awaiting human and ChatGPT architectural review and sign-off.

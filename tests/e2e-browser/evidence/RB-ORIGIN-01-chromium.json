@@ -1,0 +1,62 @@
+{
+  "testId": "RB-ORIGIN-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:21.965Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "testResults": [
+      {
+        "url": "https://leetcode.com/problems/two-sum/",
+        "type": "supported_exact",
+        "injected": true,
+        "expected": true
+      },
+      {
+        "url": "https://www.leetcode.com/problems/two-sum/",
+        "type": "supported_www",
+        "injected": true,
+        "expected": true
+      },
+      {
+        "url": "https://fakeleetcode.com/problems/two-sum/",
+        "type": "unauthorized_lookalike",
+        "injected": false,
+        "expected": false
+      },
+      {
+        "url": "https://leetcode.com.attacker.com/problems/two-sum/",
+        "type": "unauthorized_suffix_domain",
+        "injected": false,
+        "expected": false
+      },
+      {
+        "url": "https://api.leetcode.com/problems/two-sum/",
+        "type": "unauthorized_subdomain",
+        "injected": false,
+        "expected": false
+      },
+      {
+        "url": "https://example.com/problems/two-sum/",
+        "type": "unrelated_origin",
+        "injected": false,
+        "expected": false
+      }
+    ],
+    "exactOriginInjected": true,
+    "lookalikeOriginRejected": true,
+    "subdomainOriginRejected": true
+  },
+  "relevantStorageState": {
+    "manifestMatchPatternsEnforced": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "CONTENT_SCRIPT_EXACT_ORIGIN_INJECTION",
+    "LOOKALIKE_ORIGIN_INJECTION_REJECTED",
+    "UNAUTHORIZED_SUBDOMAIN_INJECTION_REJECTED",
+    "VALIDATE_PLATFORM_ORIGIN_PARITY"
+  ]
+}

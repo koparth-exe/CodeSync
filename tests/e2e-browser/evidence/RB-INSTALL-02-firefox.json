@@ -1,0 +1,24 @@
+{
+  "testId": "RB-INSTALL-02",
+  "browser": "firefox",
+  "browserVersion": "155.0",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:03.846Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "extensionId": "codesync@extension.local",
+    "installedViaBiDi": true
+  },
+  "relevantStorageState": {
+    "geckoId": "codesync@extension.local",
+    "strictMinVersion": "128.0"
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "FIREFOX_MV3_MANIFEST_ACCEPTED",
+    "GECKO_EXTENSION_ID_VERIFIED",
+    "BACKGROUND_SCRIPTS_ARRAY_ACCEPTED",
+    "STRICT_MIN_VERSION_128_ACCEPTED"
+  ]
+}

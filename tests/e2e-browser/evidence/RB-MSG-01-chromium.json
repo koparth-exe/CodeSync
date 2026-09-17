@@ -1,0 +1,22 @@
+{
+  "testId": "RB-MSG-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:13.481Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "hasMessageListeners": true,
+    "validMessageTested": true,
+    "malformedRejected": true,
+    "privilegeEscalationBlocked": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "CONTENT_SCRIPT_TO_BACKGROUND_IPC",
+    "ASYNC_RESPONSE_CHANNEL_LIFETIME",
+    "MALFORMED_NONCE_REJECTED",
+    "NO_PRIVILEGE_ESCALATION_BEYOND_ALLOWLIST"
+  ]
+}

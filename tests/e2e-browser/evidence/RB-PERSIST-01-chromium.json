@@ -1,0 +1,27 @@
+{
+  "testId": "RB-PERSIST-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:25.049Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "profileDirReused": true,
+    "browserRestartCompleted": true
+  },
+  "relevantStorageState": {
+    "metadataSurvived": true,
+    "configSurvived": true
+  },
+  "relevantIndexedDBState": {
+    "payloadSurvived": true,
+    "walSurvived": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "STORAGE_LOCAL_DURABILITY_ACROSS_RESTART",
+    "INDEXEDDB_PAYLOAD_DURABILITY_ACROSS_RESTART",
+    "INDEXEDDB_WAL_DURABILITY_ACROSS_RESTART"
+  ]
+}

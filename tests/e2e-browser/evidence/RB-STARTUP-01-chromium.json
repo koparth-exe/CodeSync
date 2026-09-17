@@ -1,0 +1,30 @@
+{
+  "testId": "RB-STARTUP-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:47.640Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "alarmRegistered": true,
+    "alarmName": "codesync_queue_drain_alarm",
+    "alarmPeriodInMinutes": 5,
+    "hasMessageListener": true
+  },
+  "relevantStorageState": {
+    "storageLocalAccessible": true
+  },
+  "relevantIndexedDBState": {
+    "indexedDBAccessible": true,
+    "objectStores": ["history", "payloads", "wal_logs"]
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "CHROMIUM_SERVICE_WORKER_INITIALIZATION",
+    "STORAGE_LOCAL_SW_ACCESS",
+    "INDEXEDDB_CODESYNC_DB_STORES_INITIALIZED",
+    "ALARM_CODESYNC_QUEUE_DRAIN_5MIN_REGISTERED",
+    "RUNTIME_MESSAGE_LISTENERS_REGISTERED"
+  ]
+}

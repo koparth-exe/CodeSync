@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+
+# WXT Build Outputs
+.output/
+.wxt/
+dist/
+coverage/
+
+# Test Runner Outputs
+test-results/
+
+# Environment and Secrets (STRICT INVARIANT: NEVER COMMIT SECRETS)
+.env
+.env.*
+*.local
+*.pem
+*.key
+*.cert
+*.pfx
+*.p12
+
+# OS Artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor & IDE Directories
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# Diagnostic and Log Dumps
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

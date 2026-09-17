@@ -1,0 +1,375 @@
+Viewed types.ts:1-45
+Listed directory messaging
+Viewed types.ts:1-100
+Viewed types.ts:101-123
+Viewed validator.ts:1-100
+Viewed validator.ts:101-180
+Viewed content.ts:1-26
+Viewed wxt.config.ts:1-37
+Viewed manifest.test.ts:1-60
+Viewed manifest.test.ts:60-121
+Viewed background.ts:1-28
+Viewed index.ts:1-60
+Viewed codes.ts:55-87
+Created task.md
+Created implementation_plan.md
+
+I have created the detailed implementation plan for **Phase 1C.3: Platform Adapter Architecture & Submission Detection**.
+
+Please review the plan in [implementation_plan.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/98066a31-ed20-4ea9-b5d0-5d845ae02183/implementation_plan.md).
+
+### Summary of Key Architecture & Design Highlights for Your Review:
+1. **Canonical Adapter Subsystem**: Establishes `src/shared/adapters/` with clean interface contracts, an in-memory event deduplicator (composite identity, sliding TTL window), and an extension-controlled adapter registry.
+2. **Platform Coverage**: Implements adapters for **LeetCode**, **CodeChef**, **Codeforces**, and **GeeksforGeeks** with exact domain boundary checks that strictly reject lookalike domains (`.evil.test`, port/username injection). Codolio is excluded.
+3. **Defense-in-Depth Trust Model**: Content script extraction is treated strictly as untrusted candidate data; the trusted background service worker enforces message envelope validation, sender tab origin verification, and bounded field validation before any ingestion.
+4. **Scope Control**: No automatic GitHub syncing, no queue draining, and no broad permissions are introduced in this phase.
+
+Please approve the plan or share any feedback so I can proceed with execution.
+
+Viewed codes.ts:70-87
+Viewed index.ts:440-467
+Edited codes.ts
+Viewed index.ts:450-467
+Edited index.ts
+Created types.ts
+Created validator.ts
+Created deduplicator.ts
+Created base-adapter.ts
+Created registry.ts
+Created leetcode-adapter.ts
+Created codechef-adapter.ts
+Created codeforces-adapter.ts
+Created geeksforgeeks-adapter.ts
+Created index.ts
+Viewed content.ts:1-26
+Created content.ts
+Viewed background.ts:1-28
+Created submission-handler.ts
+Viewed background.ts:1-28
+Created background.ts
+Viewed index.ts:1-35
+Edited index.ts
+Created platform-registry.test.ts
+Created platform-origin-security.test.ts
+Created platform-leetcode.test.ts
+Created platform-codechef.test.ts
+Created platform-codeforces.test.ts
+Created platform-geeksforgeeks.test.ts
+Created platform-normalization.test.ts
+Created platform-deduplication.test.ts
+Created platform-isolation.test.ts
+Created platform-messaging.test.ts
+Ran command: `npx vitest run`
+
+I have started running the Vitest test suite and will wait for it to complete.
+
+Viewed package.json:1-38
+Searched for "document"
+Created mock-dom.ts
+Viewed submission-handler.ts:1-82
+Viewed index.ts:1-43
+Viewed registry.ts:1-122
+Viewed platform-messaging.test.ts:1-168
+Viewed validator.ts:1-60
+Viewed validator.ts:61-120
+Viewed mock-dom.ts:1-159
+Viewed platform-leetcode.test.ts:1-60
+Viewed platform-leetcode.test.ts:61-149
+Viewed leetcode-adapter.ts:1-80
+Viewed platform-codechef.test.ts:1-99
+Viewed platform-codeforces.test.ts:1-115
+Viewed platform-geeksforgeeks.test.ts:1-109
+Viewed codechef-adapter.ts:90-140
+Viewed codechef-adapter.ts:141-200
+Edited mock-dom.ts
+Viewed platform-leetcode.test.ts:1-45
+Viewed platform-leetcode.test.ts:46-149
+Edited platform-leetcode.test.ts
+Viewed platform-codechef.test.ts:1-99
+Edited platform-codechef.test.ts
+Viewed platform-codeforces.test.ts:1-115
+Edited platform-codeforces.test.ts
+Viewed platform-geeksforgeeks.test.ts:1-109
+Edited platform-geeksforgeeks.test.ts
+Viewed submission-handler.ts:20-65
+Edited submission-handler.ts
+Viewed platform-messaging.test.ts:1-75
+Viewed platform-messaging.test.ts:76-168
+Edited platform-messaging.test.ts
+Ran command: `npx vitest run`
+
+I have launched `npx vitest run` to verify all test suites across the project including the new platform adapters and security tests. Waiting for the execution to complete.
+
+Viewed geeksforgeeks-adapter.ts:150-190
+Edited geeksforgeeks-adapter.ts
+Viewed platform-messaging.test.ts:85-125
+Viewed platform-messaging.test.ts:120-140
+Edited platform-messaging.test.ts
+Ran command: `npx vitest run`
+
+I have rerun `npx vitest run`. Waiting for the execution to finish.
+
+Ran command: `npx tsc --noEmit`
+Viewed codechef-adapter.ts:192-208
+Viewed mock-dom.ts:50-160
+Viewed mock-dom.ts:270-342
+Edited codechef-adapter.ts
+Edited mock-dom.ts
+Edited mock-dom.ts
+Ran command: `npx tsc --noEmit`
+Ran command: `npx eslint .`
+Viewed submission-handler.ts:10-20
+Edited submission-handler.ts
+Viewed mock-dom.ts:155-175
+Edited mock-dom.ts
+Viewed platform-registry.test.ts:1-20
+Viewed platform-registry.test.ts:21-60
+Viewed platform-registry.test.ts:61-123
+Edited platform-registry.test.ts
+Ran command: `npx eslint .`
+Ran command: `npx prettier --check "src/**/*.ts" "tests/**/*.ts"`
+Ran command: `npx prettier --write "src/**/*.ts" "tests/**/*.ts"`
+Ran command: `npx prettier --check "src/**/*.ts" "tests/**/*.ts"`
+
+I have launched `npx prettier --check "src/**/*.ts" "tests/**/*.ts"`. Waiting for the check to complete.
+
+Ran command: `npm run build`
+
+I have launched `npm run build` for the Chrome bundle. Waiting for the build to finish.
+
+Ran command: `npm run build:firefox`
+
+I have launched `npm run build:firefox` for the Firefox bundle. Waiting for the build to finish.
+
+Ran command: `npx vitest run`
+
+I have launched `npx vitest run`. Waiting for the final test verification to complete.
+
+Ran command: `git status --short`
+Viewed task.md:1-37
+Edited task.md
+Viewed walkthrough.md:1-60
+Created walkthrough.md
+
+# Phase 1C.3 Completion Report: Platform Adapter Architecture & Submission Detection
+
+## 1. Executive Summary
+
+Phase 1C.3 introduces CodeSync's strongly-typed **Platform Adapter Subsystem** and **Submission Detection Architecture**. It enables CodeSync to detect submission interactions and extract canonical submission candidates across four initial competitive programming platforms: **LeetCode**, **CodeChef**, **Codeforces**, and **GeeksforGeeks**.
+
+The implementation preserves the foundational trust model:
+```text
+Webpage (UNTRUSTED) → Content Script (SEMI-TRUSTED) → Service Worker (AUTHORITATIVE) → GitHub (EXTERNAL)
+```
+Platform adapters operate as semi-trusted extractors producing **candidate data, not authorization**. Extracted submissions are normalized, deduplicated against event floods, encapsulated in replay-protected extension messages with UUID v4 nonces, and authoritatively re-validated in the background service worker.
+
+Zero automatic GitHub syncing, zero automatic queue draining, zero PAT fallbacks, and zero broad permissions (`<all_urls>`, `webRequest`) were introduced.
+
+---
+
+## 2. Architecture
+
+```text
+       Platform Webpage (DOM Mutation / Click Events)
+                             ↓
+ Content Script Runner (Bounded Listeners, LRU Event Deduplication)
+                             ↓
+ Platform Adapter (LeetCode / CodeChef / Codeforces / GeeksforGeeks)
+                             ↓
+ Canonical Submission Candidate (Platform-Independent, UTF-8 Normalized, SHA-256 Hashed)
+                             ↓
+ Secure Extension Messaging Envelope (UUID v4 Nonce, Freshness Window, Anti-Replay)
+                             ↓
+ Service Worker SubmissionHandler (Authoritative Schema & Origin Verification)
+```
+
+1. **Content Script Layer**: Evaluates `window.location.href` against the extension-controlled `PlatformAdapterRegistry`. If matching, it hooks bounded click listeners and MutationObservers on platform-specific result containers.
+2. **Adapter Layer**: Implements `canHandle`, `detectSubmission`, and `extractSubmission`. Uses layered extraction (result banner → editor view-lines → textarea fallback).
+3. **Canonical Normalization**: Standardizes source code to canonical UTF-8, normalizes CRLF/CR to LF, strips trailing line whitespace, enforces a single trailing newline, and computes the canonical SHA-256 content hash using the existing hashing subsystem.
+4. **Service Worker Layer**: Receives `SUBMISSION_DETECTED` message, validates envelope nonce and freshness window, verifies that the browser runtime tab URL matches the claimed platform adapter's approved origins, and verifies schema bounds fail-closed.
+
+---
+
+## 3. Files Created
+
+| File | Purpose |
+| :--- | :--- |
+| [src/shared/adapters/types.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/types.ts) | Canonical submission model, platform IDs, status enum, adapter interface, and diagnostic types. |
+| [src/shared/adapters/validator.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/validator.ts) | Strict origin matching, source normalization, URL validation, slug sanitization, and candidate bounds validation. |
+| [src/shared/adapters/deduplicator.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/deduplicator.ts) | Memory-bounded LRU deduplication cache for submission events preventing DOM event flooding. |
+| [src/shared/adapters/base-adapter.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/base-adapter.ts) | Abstract base class encapsulating SHA-256 hashing, source normalization, candidate validation, and status mapping. |
+| [src/shared/adapters/registry.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/registry.ts) | Central static registry for platform adapters enforcing unique IDs, approved origins, and required interface methods. |
+| [src/shared/adapters/leetcode/leetcode-adapter.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/leetcode/leetcode-adapter.ts) | LeetCode platform adapter supporting `leetcode.com` problem and submission pages. |
+| [src/shared/adapters/codechef/codechef-adapter.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/codechef/codechef-adapter.ts) | CodeChef platform adapter supporting `codechef.com` problem, practice, and submit pages. |
+| [src/shared/adapters/codeforces/codeforces-adapter.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/codeforces/codeforces-adapter.ts) | Codeforces platform adapter supporting contest and problemset pages on `codeforces.com`. |
+| [src/shared/adapters/geeksforgeeks/geeksforgeeks-adapter.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/geeksforgeeks/geeksforgeeks-adapter.ts) | GeeksforGeeks platform adapter supporting `geeksforgeeks.org` and `practice.geeksforgeeks.org`. |
+| [src/shared/adapters/submission-handler.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/submission-handler.ts) | Service worker candidate validator cross-checking sender tab origin and schema invariants. |
+| [src/shared/adapters/index.ts](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/index.ts) | Barrel export and `createDefaultRegistry()` initialization factory. |
+| [tests/helpers/mock-dom.ts](file:///d:/Parth/Projects/CodeSync/tests/helpers/mock-dom.ts) | Lightweight zero-dependency mock DOM and HTML parser (`parseHTML`) for deterministic adapter testing. |
+| [tests/security/platform-registry.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-registry.test.ts) | Tests for adapter registration, duplicate rejection, and origin resolution. |
+| [tests/security/platform-origin-security.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-origin-security.test.ts) | Adversarial tests rejecting lookalike domains, subdomain hijack attempts, and malformed URLs across all platforms. |
+| [tests/security/platform-leetcode.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-leetcode.test.ts) | LeetCode click detection, result banner mutation, Monaco/textarea extraction, and failure handling. |
+| [tests/security/platform-codechef.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-codechef.test.ts) | CodeChef click detection, verdict extraction, program textarea extraction, and status mapping. |
+| [tests/security/platform-codeforces.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-codeforces.test.ts) | Codeforces submit detection, verdict span mutation, contest/problemset ID parsing, and language extraction. |
+| [tests/security/platform-geeksforgeeks.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-geeksforgeeks.test.ts) | GeeksforGeeks submit detection, success banner extraction, ACE lines extraction, and status mapping. |
+| [tests/security/platform-normalization.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-normalization.test.ts) | Source code normalization, line ending normalization, and deterministic SHA-256 hashing. |
+| [tests/security/platform-deduplication.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-deduplication.test.ts) | Event deduplication LRU cache bounds, eviction, and composite key determinism. |
+| [tests/security/platform-isolation.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-isolation.test.ts) | Cross-platform origin isolation preventing adapters from activating on alien platforms. |
+| [tests/security/platform-messaging.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/platform-messaging.test.ts) | Service worker message validation, replay rejection, context authorization, tab spoofing rejection, and payload limits. |
+
+---
+
+## 4. Files Modified
+
+| File | Reason |
+| :--- | :--- |
+| [src/shared/errors/codes.ts](file:///d:/Parth/Projects/CodeSync/src/shared/errors/codes.ts) | Added Phase 1C.3 error codes: `ADAPTER_NOT_FOUND`, `ADAPTER_ALREADY_REGISTERED`, `ADAPTER_REGISTRATION_INVALID`, `ADAPTER_EXTRACTION_FAILED`, `ADAPTER_UNSUPPORTED_ORIGIN`, `ADAPTER_INVALID_CANDIDATE`. |
+| [src/shared/errors/index.ts](file:///d:/Parth/Projects/CodeSync/src/shared/errors/index.ts) | Exported `PlatformAdapterError` class extending `CodeSyncError` with platform context. |
+| [src/entrypoints/content.ts](file:///d:/Parth/Projects/CodeSync/src/entrypoints/content.ts) | Mounted bounded submission detector runner using registered adapters, deduplicating events, and dispatching typed messages. |
+| [src/entrypoints/background.ts](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts) | Wired `SUBMISSION_DETECTED` extension messages into `defaultSubmissionHandler`. |
+
+---
+
+## 5. Adapter Inventory
+
+### LeetCode
+- **Supported Origins**: `https://leetcode.com`, `https://www.leetcode.com`
+- **Detection Strategy**: Submit button click observer (`button[data-e2e-locator="console-submit-button"]`, `button[data-cy="submit-code-btn"]`) + DOM MutationObserver on result containers (`[data-e2e-locator="submission-result"]`, `[class*="result-state-"]`).
+- **Extraction Strategy**: Extracts problem slug from URL pathname (`/problems/:slug`), title from `[data-cy="question-title"]`, difficulty from `[class*="text-difficulty-"]`, language from `#headlessui-listbox-button-1`, submission ID from submission detail anchor (`/submissions/detail/:id/`).
+- **Status Handling**: Maps "Accepted" → `ACCEPTED`; "Wrong Answer", "Time Limit Exceeded", "Memory Limit Exceeded", "Runtime Error", "Compile Error" → `REJECTED`; "Pending", "Judging" → `PENDING`.
+- **Source Extraction Strategy**: Layered: 1) Monaco editor view lines (`.monaco-editor .view-line`), 2) Textarea editor fallback (`textarea[data-cy="code-editor"]`).
+- **Diagnostics**: Records `rawStatusText`, `extractionConfidence`, and `extractionLayer` (`dom`).
+- **Limitations**: LeetCode frequently iterates on its UI classes; relies on stable `data-e2e-locator` and `data-cy` attributes with generic fallback selectors.
+
+### CodeChef
+- **Supported Origins**: `https://www.codechef.com`, `https://codechef.com`
+- **Detection Strategy**: Submit button click (`#edit-submit`, `button[class*="submit"]`) + MutationObserver on `.status-container`, `[class*="verdict-"]`.
+- **Extraction Strategy**: Extracts problem code from URL (`/(?:problems|submit)/:code`) or breadcrumb heading, language from `select[id*="language"]`, submission ID from `/viewsolution/:id` or DOM table.
+- **Status Handling**: Maps "Correct Answer" → `ACCEPTED`; "Wrong Answer", "Time Limit Exceeded", "Runtime Error", "Compilation Error" → `REJECTED`; "Running", "Queued" → `PENDING`.
+- **Source Extraction Strategy**: Layered: 1) Monaco/Ace view lines, 2) Textarea `textarea[name="program"]`, 3) `#edit-program`.
+- **Diagnostics**: Captures `rawStatusText` and extraction layer.
+- **Limitations**: Problem code formats differ between legacy and modern contest UI; supports standard 3–15 character uppercase/digit problem codes.
+
+### Codeforces
+- **Supported Origins**: `https://codeforces.com`, `https://www.codeforces.com`, `https://m1.codeforces.com`, `https://m2.codeforces.com`, `https://m3.codeforces.com`
+- **Detection Strategy**: Submit button click (`input.submit[type="submit"]`, `.submit-form input[type="submit"]`) + MutationObserver on `.verdict-accepted`, `.verdict-rejected`, `span[class*="verdict-"]`.
+- **Extraction Strategy**: Extracts contest ID and problem index from URL (`/contest/:id/problem/:idx` or `/problemset/problem/:id/:idx`) combining into canonical ID (e.g. `1850A`), problem title from `.problem-statement .title`, language from `select[name="programTypeId"]`, submission ID from `tr[data-submission-id]` table rows.
+- **Status Handling**: Maps "Accepted" → `ACCEPTED`; "Wrong answer", "Time limit exceeded", "Memory limit exceeded", "Runtime error", "Compilation error" → `REJECTED`; "In queue", "Running" → `PENDING`.
+- **Source Extraction Strategy**: Layered: 1) `#sourceCodeText` textarea, 2) Ace editor lines, 3) DOM fallback.
+- **Diagnostics**: Includes `contestId`, `rawStatusText`, and verdict metadata.
+- **Limitations**: Mirrored/mobile domains (`m1`, `m2`, `m3`) are supported, but custom third-party mirrors are rejected for security.
+
+### GeeksforGeeks
+- **Supported Origins**: `https://www.geeksforgeeks.org`, `https://geeksforgeeks.org`, `https://practice.geeksforgeeks.org`
+- **Detection Strategy**: Submit button click (`.problems_submit_button__`, `button:contains("Submit")`) + MutationObserver on result text container (`.problems_content__`, `.ui.positive.message`).
+- **Extraction Strategy**: Extracts problem slug from URL pathname (`/problems/:slug`), problem title from `h3` / `.problem-title`, difficulty from `.difficulty` badge, language from `.language-btn` / `select[class*="language"]`, submission ID from `[data-submission-id]`.
+- **Status Handling**: Maps "Problem Solved Successfully", "Correct" → `ACCEPTED`; "Wrong Answer", "Time Limit Exceeded", "Compilation Error" → `REJECTED`; "Evaluating", "Running" → `PENDING`.
+- **Source Extraction Strategy**: Layered: 1) ACE editor lines (`.ace_line`), 2) Monaco view lines, 3) textarea/pre code fallback.
+- **Diagnostics**: Records `rawStatusText` and confidence score.
+- **Limitations**: GFG uses dynamic obfuscated CSS modules (`problems_submit_button__`); adapter relies on resilient prefix matching (`class*="problems_submit_button"`).
+
+---
+
+## 6. Security
+
+### Origin Validation
+Every adapter defines an immutable `supportedOrigins` array of canonical origins. Validation uses `URL` structural parsing (`parsed.origin`) with exact scheme and hostname equality matching. Subdomain wildcards and loose substring matching (`url.includes("leetcode")`) are strictly forbidden. Lookalike domains (`leetcode.com.evil.test`, `evil-leetcode.com`) are systematically rejected.
+
+### Trust Separation
+- **Webpage (UNTRUSTED)**: The webpage DOM can be manipulated by malicious scripts or extensions.
+- **Content Script (SEMI-TRUSTED)**: Gathers DOM state, runs deduplication, but has zero write authority.
+- **Service Worker (TRUSTED)**: Authoritative boundary. Validates incoming message sender context via the browser runtime (`runtimeSender.tab`), cross-references the tab URL with the claimed platform, and enforces full schema validation.
+- **GitHub (EXTERNAL)**: Remote target. Never receives writes from content scripts directly.
+
+### Input Validation
+All fields extracted from pages are treated as untrusted strings. The `validateCanonicalSubmission` routine validates:
+- `platform`: Must be in `SUPPORTED_PLATFORMS` allowlist.
+- `status`: Must be in `CANONICAL_STATUSES` allowlist.
+- `problemId`: Non-empty, alphanumeric/dash/underscore, max 128 chars.
+- `problemTitle`: Max 256 chars, stripped of control characters.
+- `language`: Max 64 chars.
+- `sourceCode`: Non-empty, max `MAX_SOURCE_PAYLOAD_BYTES` (500KB), zero ASCII control characters (`\0` through `\x08`, `\x0B`, `\x0E` through `\x1F`).
+
+### URL Validation
+All candidate URLs (`problemUrl`, `sourceUrl`) are parsed via `new URL()`. Only `http:` and `https:` protocols are accepted. Dangerous schemes (`javascript:`, `data:`, `blob:`, `file:`) throw immediate `SecurityError`.
+
+### Source Code Handling
+Extracted source code is treated strictly as plain text. It is never evaluated (`eval`), never passed to `new Function()`, and never rendered using `innerHTML`.
+
+### Permissions
+Zero unnecessary permissions were added. CodeSync maintains its existing manifest with **zero** `<all_urls>`, **zero** `webRequest`, **zero** `webRequestBlocking`, **zero** `cookies`, **zero** `tabs`, and **zero** `scripting` permissions.
+
+### Anti-Replay & Message Protection
+Every submission event message sent across extension contexts carries:
+- A cryptographically random UUID v4 nonce (`crypto.randomUUID()`)
+- A high-resolution numeric timestamp validated against a sliding freshness window (max age 30s, max future skew 5s)
+- Sender context verified through runtime metadata
+- In-memory anti-replay tracking ensuring no message nonce is processed twice
+
+### Authorization Invariant
+Extracted candidates from webpages **cannot authorize GitHub operations**. Candidate data is purely diagnostic and ingestive. Downstream sync requires authoritative user authentication, explicit policy approval, repository configuration, and queue processing.
+
+---
+
+## 7. Tests
+
+| Test Suite | Path | Tests | Status |
+| :--- | :--- | :---: | :---: |
+| **Adapter Registry** | `tests/security/platform-registry.test.ts` | 7 | PASS |
+| **Origin Security & Lookalikes** | `tests/security/platform-origin-security.test.ts` | 14 | PASS |
+| **LeetCode Adapter** | `tests/security/platform-leetcode.test.ts` | 6 | PASS |
+| **CodeChef Adapter** | `tests/security/platform-codechef.test.ts` | 4 | PASS |
+| **Codeforces Adapter** | `tests/security/platform-codeforces.test.ts` | 4 | PASS |
+| **GeeksforGeeks Adapter** | `tests/security/platform-geeksforgeeks.test.ts` | 4 | PASS |
+| **Normalization & Hashing** | `tests/security/platform-normalization.test.ts` | 6 | PASS |
+| **Event Deduplication** | `tests/security/platform-deduplication.test.ts` | 4 | PASS |
+| **Cross-Platform Isolation** | `tests/security/platform-isolation.test.ts` | 5 | PASS |
+| **Platform Messaging & SW Security** | `tests/security/platform-messaging.test.ts` | 8 | PASS |
+| **Pre-existing Baseline Suites (Phase 0–1C.2.1)** | 20 test files | 243 | PASS |
+| **TOTAL** | **30 test files** | **305** | **PASS** |
+
+- **Total Tests**: 305
+- **New Tests**: 62
+- **Security & Adversarial Tests**: 29
+- **Passed**: 305
+- **Failed**: 0
+
+---
+
+## 8. Quality Gates
+
+| Quality Gate | Command | Result |
+| :--- | :--- | :---: |
+| **Unit & Security Tests** | `npx vitest run` | **305/305 passing** (30 test files) |
+| **TypeScript Typecheck** | `npx tsc --noEmit` | **0 errors** (clean) |
+| **ESLint** | `npx eslint .` | **0 errors** (clean) |
+| **Prettier Formatting** | `npx prettier --check "src/**/*.ts" "tests/**/*.ts"` | **All files clean** |
+| **Chrome MV3 Build** | `npm run build` | **Built successfully** (`.output/chrome-mv3`) |
+| **Firefox MV3 Build** | `npm run build:firefox` | **Built successfully** (`.output/firefox-mv3`) |
+
+---
+
+## 9. Scope Verification
+
+The following features were **NOT implemented**, preserving exact Phase 1C.3 boundaries:
+- Automatic GitHub sync: **NOT IMPLEMENTED**
+- Queue draining: **NOT IMPLEMENTED**
+- PAT fallback: **NOT IMPLEMENTED**
+- Remote backend: **NOT IMPLEMENTED**
+- Codolio adapter: **NOT IMPLEMENTED** (deferred to dedicated later phase)
+- Broad permissions (`<all_urls>`, `webRequest`): **NOT INTRODUCED**
+- Phase 1C.4+ features: **NOT IMPLEMENTED**
+
+---
+
+## 10. Known Limitations
+
+1. **DOM Structure Volatility**: Coding platforms frequently deploy frontend updates that rename or shuffle DOM classes. While adapters employ multi-selector fallbacks (e.g. Monaco editor view lines falling back to native textareas), substantial redesigns on a target site may require adapter selector updates.
+2. **Dynamic SPA Hydration**: Certain single-page platforms (e.g. modern LeetCode contest interfaces) dynamically re-render result DOM nodes asynchronously; detection relies on MutationObservers and may require user interaction (e.g. clicking "Submit" or navigating to the result tab) if result nodes are mounted lazily.
+3. **No Network-Level Interception**: By design, CodeSync avoids `webRequest` interception to respect least-privilege security. Consequently, platforms where source code is wiped from the DOM immediately upon submission without retaining a visible editor require page-context fallback extraction.
+
+---
+
+## 11. Final Verdict
+
+> **PHASE 1C.3 COMPLETE — READY FOR SECURITY REVIEW**

@@ -1,0 +1,35 @@
+{
+  "testId": "RB-LIFECYCLE-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:09.223Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "workerTerminatedViaCDP": true,
+    "cdpStatusTransitions": [
+      "running",
+      "stopping",
+      "stopped",
+      "starting",
+      "starting",
+      "starting",
+      "running"
+    ],
+    "recoveredState": "requires_attention",
+    "crashCount": 1
+  },
+  "relevantStorageState": {
+    "fencingTokenEnforced": "[REDACTED_PRESENCE_ONLY]",
+    "staleWorkerRejected": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "CDP_SERVICE_WORKER_TERMINATION",
+    "CDP_SERVICE_WORKER_STARTUP",
+    "CRASH_COUNT_INCREMENTED_ON_RESTART",
+    "PROCESSING_ITEM_RECONCILED",
+    "STALE_WORKER_FENCING_TOKEN_ENFORCEMENT"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "testId": "RB-NET-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:14.964Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "serviceWorkerFetchSuccess": true,
+    "abortSignalHandled": true,
+    "abortErrorName": "AbortError"
+  },
+  "relevantNetworkResults": {
+    "receivedMethod": "POST",
+    "receivedAcceptHeader": "application/vnd.github.v3+json",
+    "authorizationHeaderPresent": "[REDACTED_PRESENCE_ONLY]"
+  },
+  "invariantsExercised": [
+    "SERVICE_WORKER_ORIGIN_FETCH",
+    "CUSTOM_HEADERS_PRESERVED",
+    "CACHE_NO_STORE_HONORED",
+    "ABORT_CONTROLLER_SIGNAL_HANDLED",
+    "ZERO_LIVE_GITHUB_TRAFFIC"
+  ],
+  "notes": "Local mock server proved Service Worker fetch protocol, headers, no-store, and abort behavior. Per Zero-Live-Traffic safety invariant, actual api.github.com host permission boundary remains verified via manifest host_permissions parsing without external live traffic."
+}

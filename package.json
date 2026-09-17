@@ -1,0 +1,39 @@
+{
+  "name": "codesync",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-browser extension for synchronizing competitive programming solutions to GitHub",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "compile": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,html,css}\"",
+    "format": "prettier --write \"**/*.{ts,tsx,json,html,css}\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@playwright/test": "^1.63.0",
+    "@types/chrome": "^0.2.9",
+    "@types/node": "^22.13.0",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@wxt-dev/module-react": "^1.2.2",
+    "eslint": "^9.20.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0",
+    "vitest": "^3.0.5",
+    "wxt": "0.21.4"
+  }
+}

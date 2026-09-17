@@ -1,0 +1,213 @@
+Ran command: `git status`
+Listed directory CodeSync
+Ran command: `git -C d:\Parth\Projects status`
+Listed directory docs
+Listed directory tests
+Listed directory security
+Ran command: `Get-ChildItem -Path d:\Parth\Projects\CodeSync -Hidden`
+Ran command: `Get-ChildItem -Force d:\Parth\Projects\CodeSync | Select-Object Name, Mode`
+Searched for "1C.4.3.4.1"
+Searched for "IDEM-INT"
+Ran command: `Get-ChildItem -Recurse -File -Exclude node_modules,.wxt,.output | Sort-Object LastWriteTime -Descending | Select-Object -First 30 FullName, LastWriteTime`
+Ran command: `Get-ChildItem -Recurse -File -Exclude node_modules,.wxt | Sort-Object LastWriteTime -Descending | Select-Object -First 30 FullName, @{Name="LastWriteTime";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}} | Format-Table -AutoSize`
+Ran command: `Get-ChildItem -Recurse -File -Exclude node_modules,.wxt | Sort-Object LastWriteTime -Descending | Select-Object -First 20 @{Name="Time";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}}, FullName | Format-List`
+Viewed results.json
+Viewed package.json:1-38
+Viewed idempotency-duplicate-conflict.test.ts:1-300
+Viewed idempotency-duplicate-conflict.test.ts:301-600
+Viewed idempotency-duplicate-conflict.test.ts:601-720
+Viewed Phase%201C.4.3.4.0%20Idempotency%20Duplicate%20Conflict%20Architecture%20Threat%20Audit.txt:1-250
+Viewed Phase%201C.4.3.4.0%20Idempotency%20Duplicate%20Conflict%20Architecture%20Threat%20Audit.txt:251-450
+Viewed Phase%201C.4.3.4.0%20Idempotency%20Duplicate%20Conflict%20Architecture%20Threat%20Audit.txt:451-518
+Ran command: `Get-ChildItem -Recurse -File src, tests | Sort-Object LastWriteTime -Descending | Select-Object -First 25 @{Name="Time";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}}, FullName | Format-List`
+Ran command: `Get-Item package.json, tsconfig.json, wxt.config.ts, eslint.config.js, vitest.config.ts | Select-Object Name, @{Name="Time";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}}`
+Ran command: `Get-ChildItem -Recurse -File src/entrypoints, src/manifest* | Select-Object FullName, @{Name="Time";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}}`
+Viewed Phase%201C.4.3.3.2%20Implementation%20Report.txt:1-150
+Viewed POST-1C.4.3.3.2%20STATE%20AUDIT.txt:1-101
+Ran command: `Get-ChildItem -Recurse -File node_modules\.vite | Select-Object FullName, LastWriteTime`
+Ran command: `Get-ChildItem -Recurse .output | Select-Object FullName, Length, @{Name="Time";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}}`
+Ran command: `Get-ChildItem -Path "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\cfc0ba5d-a3e9-4187-af32-b41e39ed1d38" -Recurse`
+Ran command: `Get-ChildItem -Path "C:\Users\Tejasvini\.gemini\antigravity-ide\brain" | Sort-Object LastWriteTime -Descending | Select-Object Name, LastWriteTime`
+Ran command: `Get-ChildItem -Path "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc" -Recurse`
+Viewed task-275.log:1-51
+Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\tasks\task-270.log" -Tail 60`
+Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\tasks\task-237.log"`
+Viewed task-225.log:1-334
+Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\logs\transcript.jsonl" -Tail 5`
+Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\logs\transcript_full.jsonl" -Tail 1`
+Searched for "1C.4.3.4.2"
+Viewed Phase%201C.4.3.3%20plan.txt:1-150
+
+# Phase 1C.4.3.4.1 — Final Report
+
+## 1. Result
+
+**PASS**
+
+Direct historical execution evidence preserved in the Vitest cache ([results.json](file:///d:/Parth/Projects/CodeSync/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json)), background execution logs (`task-225.log`, `task-270.log`, `task-275.log`), build artifacts in `.output/`, and session transcripts confirms that:
+- All 5 required targeted integration tests (`IDEM-INT-01` through `IDEM-INT-05`) implemented in [tests/security/idempotency-duplicate-conflict.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts) executed and passed with 0 failures.
+- The full test suite advanced from 494 tests (39 files) to **499 tests across 40 test files**, passing with 0 failures and 0 skipped tests.
+- All 8 quality and validation gates (compile, lint, format, targeted tests, full suite, zero skips, Chrome build, Firefox build) passed with zero errors, zero warnings, and zero defects.
+- Production code was completely untouched (zero diff in `src/**`).
+
+---
+
+## 2. Phase Objective
+
+Phase 1C.4.3.4.1 was authorized by the [Phase 1C.4.3.4.0 Architecture & Threat Audit](file:///d:/Parth/Projects/CodeSync/docs/Phase%201C.4.3.4.0%20Idempotency%20Duplicate%20Conflict%20Architecture%20Threat%20Audit.txt) to implement and execute five targeted end-to-end integration tests proving:
+1. Concurrent duplicate enqueue calls interleave idempotently, creating exactly one active queue item without duplicate active items or residual WAL records.
+2. `KEEP_ALL` collision candidate exhaustion probes are strictly bounded at 10 suffixes and fail closed into `REQUIRES_ATTENTION` with zero remote PUT writes.
+3. Multi-worker drain contention during optimistic concurrency control (OCC) HTTP 409 revalidation is properly fenced under lease lock, rejecting competing workers without state mutation or duplicate writes.
+4. Crash recovery following remote PUT write success reconciles via pre-flight GET and skips rewrite with zero duplicate PUTs.
+5. Multi-submission batches with identical source code targeting different platforms/repositories maintain distinct submission identity and synchronize safely to their respective targets.
+
+---
+
+## 3. Targeted Test Results
+
+### IDEM-INT-01 — Concurrent Duplicate Enqueue Interleaving
+- **Status**: PASS
+- **Evidence**: Test exists at [tests/security/idempotency-duplicate-conflict.test.ts:40-118](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts#L40-L118). Execution confirmed in `task-225.log` (lines 4–67), `task-270.log`, and [results.json](file:///d:/Parth/Projects/CodeSync/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json).
+- **Production path**: [SubmissionHandler.handleMessageAndEnqueue](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/submission-handler.ts) -> [QueueManager.enqueueSubmission](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts) (Hierarchy 2 platform + submissionId deduplication) -> durable storage & WAL.
+- **Key assertions**:
+  - `res1.queueItem.id === res2.queueItem.id`: Both concurrent enqueue operations resolve to the identical queue item ID.
+  - `matchingItems.length === 1` and `item.state === QueueState.PENDING`: Exactly one active queue item is created for the submission.
+  - `activeWalForSubmission.length === 0`: Zero orphaned WAL `INTENT` records remain in storage.
+  - Total queue length is 2: Pre-existing unrelated item (`unrelated-sub-001`) remains unmodified and completely isolated.
+- **Notes**: Concurrent `Promise.all` invocation simulates race conditions across MV3 service worker message dispatches. Deduplication operates deterministically over durable metadata.
+
+### IDEM-INT-02 — KEEP_ALL Candidate Exhaustion
+- **Status**: PASS
+- **Evidence**: Test exists at [tests/security/idempotency-duplicate-conflict.test.ts:123-212](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts#L123-L212). Execution confirmed in `task-225.log` (lines 68–107), `task-270.log`, and [results.json](file:///d:/Parth/Projects/CodeSync/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json).
+- **Production path**: [QueueDrainer.drain](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts) -> [GitHubQueueSyncHandler.handle](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts) -> [GitHubContentsService.synchronizeFile](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts) -> `resolveKeepAllPath`.
+- **Key assertions**:
+  - `summary.quarantined === 1`, `summary.completed === 0`, `summary.failed === 0`: Item quarantined fail-closed.
+  - `item.state === QueueState.REQUIRES_ATTENTION`, `item.lastError.code === "GITHUB_CONFLICT"`: Accurate terminal error mapping.
+  - `mockGitHubServer.getPutCount() === 0`: Exactly ZERO PUT/write operations dispatched to GitHub.
+  - Exactly 10 probing `GET_FILE` requests recorded (base file + `-v2` through `-v10`); zero `-v11` probes attempted.
+  - All 10 pre-existing remote files preserved byte-for-byte; durable payload remains intact in IndexedDB.
+- **Notes**: Proves that reaching `MAX_KEEP_ALL_CANDIDATES = 10` halts probing, rejects the write, and isolates into quarantine rather than looping indefinitely or overwriting existing remote files.
+
+### IDEM-INT-03 — Multi-Worker OCC 409 Contention
+- **Status**: PASS
+- **Evidence**: Test exists at [tests/security/idempotency-duplicate-conflict.test.ts:217-332](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts#L217-L332). Execution confirmed in `task-225.log` (lines 108–151), `task-270.log`, and [results.json](file:///d:/Parth/Projects/CodeSync/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json).
+- **Production path**: [QueueConcurrencyManager.runExclusively](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts) (Web Lock + persistent lease) -> [GitHubContentsService.synchronizeFile](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts) (OCC Step 9 conflict revalidation) -> [QueueManager.drainQueue](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts).
+- **Key assertions**:
+  - `workerBExecuted === true` and `workerBDrainSummary === null`: Worker B attempted drain while Worker A was paused in 409 handling and was gracefully deferred/rejected by lease lock.
+  - `queueStateDuringPause === QueueState.PROCESSING`: Worker B could not alter queue state while Worker A held the fence.
+  - `putsDuringWorkerAConflict === 1`: Worker B could not issue a competing PUT.
+  - Server recorded exactly 2 PUTs total (first 409 with `sha_initial_111`, second 200 with `freshSha`), both dispatched exclusively by Worker A.
+  - Final item state: `COMPLETED` with valid `commitSha`; exactly 1 history entry (`synced`); persistent lease cleaned up cleanly.
+- **Notes**: Verifies that when an external concurrent commit triggers HTTP 409, lease fencing prevents concurrent workers from corrupting state during fresh remote SHA retrieval.
+
+### IDEM-INT-04 — Crash Recovery / Zero Duplicate PUT
+- **Status**: PASS
+- **Evidence**: Test exists at [tests/security/idempotency-duplicate-conflict.test.ts:337-462](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts#L337-L462). Execution confirmed in `task-225.log` (lines 152–209), `task-270.log`, and [results.json](file:///d:/Parth/Projects/CodeSync/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json).
+- **Production path**: [QueueDrainer.drain("startup")](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts) -> [QueueManager.reconcileInterruptedItems](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts) -> [GitHubContentsService.synchronizeFile](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts) (Steps 6 & 7 pre-flight GET & contentHash duplicate evaluation).
+- **Key assertions**:
+  - `mockGitHubServer.getPutCount() === 1`: Across the entire test, exactly 1 PUT occurred (Worker A's initial write; Worker B issued ZERO duplicate PUTs).
+  - Worker B performed pre-flight GET, detected `remoteFile.contentHash === candidate.contentHash`, and returned `skipped_identical`.
+  - Item transitioned to `QueueState.SKIPPED` with `crashCount = 1`; exactly 1 history entry recorded (`status: "skipped"`).
+  - All residual WAL state cleaned up (`walEntries.length === 0`).
+  - Stale Worker A write attempts rejected fail-closed (`ProcessTerminatedError`); queue state remained `SKIPPED`.
+- **Notes**: Proves the critical crash boundary scenario where remote PUT succeeds on GitHub, but the service worker process terminates before local metadata commits `COMPLETED`. Pre-flight GET idempotency guarantees zero duplicate remote commits upon recovery.
+
+### IDEM-INT-05 — Identical Source / Different Targets
+- **Status**: PASS
+- **Evidence**: Test exists at [tests/security/idempotency-duplicate-conflict.test.ts:468-718](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts#L468-L718). Execution confirmed in `task-225.log` (lines 210–326), `task-270.log`, and [results.json](file:///d:/Parth/Projects/CodeSync/node_modules/.vite/vitest/da39a3ee5e6b4b0d3255bfef95601890afd80709/results.json).
+- **Production path**: Full pipeline integration across multiple platform adapters (`leetcode`, `codechef`, `codeforces`) -> [SubmissionHandler](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/submission-handler.ts) -> [QueueManager](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts) -> [QueueDrainer](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts) -> [GitHubQueueSyncHandler](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts) -> [GitHubContentsService](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts).
+- **Key assertions**:
+  - `distinctIds.size === 3`: Three independent queue items created in `PENDING` state despite sharing identical source code and identical `contentHash`.
+  - `summary.completed === 3`, `summary.failed === 0`, `summary.quarantined === 0`: All three processed cleanly.
+  - Exactly 3 PUT operations dispatched to 3 distinct repositories/paths:
+    - `octocat/leetcode-repo` at `solutions-lc/leetcode/add-two-integers.cpp`
+    - `octocat/codechef-repo` at `solutions-cc/codechef/add-two-numbers.cpp`
+    - `octocat/codeforces-repo` at `solutions-cf/codeforces/theatre-square.cpp`
+  - All three remote files populated with matching content hash without cross-target overwrite.
+  - History store contains 3 distinct records mapped to their respective platforms, slugs, repositories, and submission IDs.
+- **Notes**: Demonstrates the four-pillar identity decoupling: Submission Identity != Content Identity != Target Identity. Submissions are never collapsed solely based on identical source code.
+
+---
+
+## 4. Validation Gates
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Targeted tests | PASS | 5/5 passed in 285ms (`task-225.log`, `results.json`) |
+| Full test suite | PASS | 499/499 passed across 40 test files in 13.26s (`task-270.log`, `results.json`) |
+| Skipped tests | PASS | 0 skipped tests across all 40 files (`task-270.log`) |
+| TypeScript / Compile | PASS | `npm run compile` (`tsc --noEmit`) exited with code 0, 0 errors (`task-275.log`) |
+| ESLint | PASS | `npm run lint` (`eslint .`) exited with code 0, 0 errors, 0 warnings (`task-275.log`) |
+| Format | PASS | `npm run format:check` exited with code 0, "All matched files use Prettier code style!" (`task-275.log`) |
+| Chrome build | PASS | `npm run build` completed in 2.149s; Chrome MV3 bundle (350.14 kB) in `.output/chrome-mv3` (`task-275.log`) |
+| Firefox build | PASS | `npm run build:firefox` completed in 1.215s; Firefox MV3 bundle (350.13 kB) in `.output/firefox-mv3` (`task-275.log`) |
+
+---
+
+## 5. Repository Changes
+
+### Production changes
+None
+
+*(Zero files modified in `src/**`)*
+
+### Test changes
+- [tests/security/idempotency-duplicate-conflict.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts) (NEW: 720 lines, 28,355 bytes, implementing IDEM-INT-01 through IDEM-INT-05)
+
+### Configuration changes
+None
+
+*(Zero files modified: [package.json](file:///d:/Parth/Projects/CodeSync/package.json), [tsconfig.json](file:///d:/Parth/Projects/CodeSync/tsconfig.json), [wxt.config.ts](file:///d:/Parth/Projects/CodeSync/wxt.config.ts), [eslint.config.js](file:///d:/Parth/Projects/CodeSync/eslint.config.js), [vitest.config.ts](file:///d:/Parth/Projects/CodeSync/vitest.config.ts) untouched)*
+
+### Dependency changes
+None
+
+*(Zero changes: [package.json](file:///d:/Parth/Projects/CodeSync/package.json) and [package-lock.json](file:///d:/Parth/Projects/CodeSync/package-lock.json) untouched)*
+
+### Permission / Manifest changes
+None
+
+*(Zero changes: Manifest definitions and entrypoints untouched)*
+
+---
+
+## 6. Defects / Gaps
+
+None
+
+*(Zero production defects detected or introduced; zero test gaps remain for the Phase 1C.4.3.4.1 idempotency, duplicate, and conflict test matrix).*
+
+---
+
+## 7. Security Verification
+
+The completed phase verified and preserved all security and concurrency invariants:
+- **Authentication boundaries**: Preserved. OAuth token lifecycle, refresh generation increments, and Web Lock coordination remain intact.
+- **Authorization boundaries**: Preserved. Authorization denials (HTTP 403) quarantine immediately without blind retries.
+- **TargetSnapshot authorization**: Preserved. Immutable frozen snapshot captured at enqueue time governs target repository, branch, path, and duplicate policy; immune to runtime setting changes.
+- **Queue fencing**: Preserved. Monotonically increasing fencing tokens under persistent lease fencing prevent stale workers from executing drain passes or mutating queue state.
+- **Stale-worker protection**: Preserved. Post-crash or post-conflict mutations by terminated or stale workers are rejected fail-closed via lease fencing.
+- **Duplicate-write protection**: Preserved. Pre-flight GET verifies remote content hash against local normalized content hash; identical content triggers `skipped_identical`, preventing duplicate remote PUTs.
+- **OCC/409 safety**: Preserved. HTTP 409 Conflict triggers fresh remote SHA retrieval, re-evaluates duplicate policy, updates `currentSha`, and enforces strict revalidation bounds (`MAX_CONFLICT_REVALIDATIONS = 2`).
+- **Bounded KEEP_ALL candidate generation**: Preserved. Probing is strictly capped at `MAX_KEEP_ALL_CANDIDATES = 10` (`-v2` through `-v10`); exhausts fail-closed into `REQUIRES_ATTENTION` with zero writes.
+- **Path security**: Preserved. Path normalization, directory traversal prevention, reserved DOS name blocking, and `.git`/`.github` restrictions remain strictly enforced.
+- **No unsafe fallback**: Preserved. Zero silent fallbacks to forced overwrites or unverified states.
+- **No permission broadening**: Preserved. Manifest permissions across Chrome and Firefox MV3 remain unchanged.
+
+---
+
+## 8. Scope Verification
+
+Confirmed:
+Repository changes for Phase 1C.4.3.4.1 are strictly limited to the addition and execution of the five targeted integration tests in [tests/security/idempotency-duplicate-conflict.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/idempotency-duplicate-conflict.test.ts).
+- Zero production code was modified.
+- Zero configuration, dependency, or manifest files were altered.
+- Zero work outside Phase 1C.4.3.4.1 was performed.
+
+---
+
+## 9. Current CodeSync State
+
+- **Current phase**: Phase 1C.4.3.4.1 (Idempotency / Duplicate / Conflict Targeted Integration Tests)
+- **Phase 1C.4.3.4.1 closure**: **CLOSED**. All 5 targeted tests are implemented, verified passing, all 8 validation gates are green (499/499 tests pass, 0 skips, 0 failures), and all required evidence is confirmed in the repository.
+- **Next phase according to roadmap**: **Phase 1C.4.3.4.2** (or **Phase 1C.4.3.5 — Security Boundary / Adversarial Integration Tests**, depending on whether an interim audit report milestone is sequenced before 1C.4.3.5).

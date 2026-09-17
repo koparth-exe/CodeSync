@@ -1,0 +1,212 @@
+Viewed drainer.ts:1-100
+Viewed drainer.ts:101-118
+Viewed background.ts:15-60
+Viewed background.ts:73-120
+Created drainer.ts
+Viewed background.ts:1-40
+Edited background.ts
+Viewed drainer.ts:1-120
+Viewed background.ts:1-124
+Viewed queue-drainer.test.ts:1-515
+Viewed submission-to-queue.test.ts:1-200
+Searched for "cannot message"
+Searched for "cannot invoke"
+Searched for "content script"
+Viewed queue-drainer.test.ts:395-440
+Edited queue-drainer.test.ts
+Ran command: `npm test`
+
+I have updated `tests/security/queue-drainer.test.ts` to reflect the fail-closed no-op behavior and added test cases `QD-SAFE-01` through `QD-SAFE-10`. I have now launched `npm test` to run the test suite and will verify the results once the run completes.
+
+Used tool: manage_task
+Ran command: `npm run compile`
+Viewed queue-drainer.test.ts:590-640
+Edited queue-drainer.test.ts
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Viewed package.json:1-38
+Ran command: `npm run format:check`
+Ran command: `npm run format`
+Ran command: `npm run format:check`
+Ran command: `npm test`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+Ran command: `git status -s`
+Viewed wxt.config.ts:1-37
+Viewed walkthrough.md:1-40
+Created walkthrough.md
+
+# CODE-SYNC — PHASE 1C.4.2.1 CORRECTION REPORT
+### QUEUE DRAINER SAFETY / NO-OP HANDLER FIX
+
+---
+
+### 1. Root Cause
+In the initial Phase 1C.4.2.1 implementation, [`QueueDrainer`](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts) defined a synthetic `defaultHandler` returning `{ status: "failed", error: { code: ErrorCode.UNSUPPORTED_OPERATION } }`. When any external trigger fired without a real handler registered (e.g. `submission_event`, `startup`, `alarm`), `QueueDrainer.drain(...)` passed this fallback handler to `QueueManager.drainQueue(...)`. `QueueManager` then processed eligible `PENDING` items through this handler, incremented their `attempts`, and transitioned them to `FAILED` with exponential backoff. This violated the fail-closed non-destructive invariant of unconfigured queue draining prior to Phase 1C.4.2.2.
+
+---
+
+### 2. Exact Files Changed
+1. [`src/shared/queue/drainer.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts)
+   - Removed `defaultHandler` and the synthetic `UNSUPPORTED_OPERATION` failure logic.
+   - Updated `drain(triggerSource)` to check `if (!this.handler)` immediately and return `null` before calling `QueueManager.drainQueue`.
+   - Added `hasHandler(): boolean` helper method.
+   - Updated `setHandler(handler?: QueueItemHandler | undefined): void` to allow safely registering and unsetting handlers.
+   - Replaced inaccurate comments with the authoritative extension messaging security invariant.
+2. [`src/entrypoints/background.ts`](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts)
+   - Updated security invariant documentation to reflect the validated extension messaging boundary.
+3. [`tests/security/queue-drainer.test.ts`](file:///d:/Parth/Projects/CodeSync/tests/security/queue-drainer.test.ts)
+   - Updated delegation tests (`DR-01`, `DR-02`, `DR-06`, `DR-07`, `DR-10`) to register a test handler when verifying `QueueManager.drainQueue` pass-through semantics.
+   - Updated `DR-14` to assert the non-destructive fail-closed no-op behavior when unconfigured.
+   - Added the full `QD-SAFE` regression test suite (`QD-SAFE-01` through `QD-SAFE-10`).
+
+---
+
+### 3. Exact Behavior Before Correction
+When an unconfigured `QueueDrainer` received a drain trigger (`submission_event`, `alarm`, `startup`):
+```
+TRIGGER FIRED -> QueueDrainer.drain(...)
+  -> QueueManager.drainQueue(triggerSource, defaultHandler)
+  -> Acquired persistent lease
+  -> Claimed PENDING item -> PROCESSING
+  -> defaultHandler returned { status: "failed", UNSUPPORTED_OPERATION }
+  -> QueueManager marked item FAILED, incremented attempts, modified backoff
+```
+
+---
+
+### 4. Exact Behavior After Correction
+When an unconfigured `QueueDrainer` receives a drain trigger (`submission_event`, `alarm`, `startup`):
+```
+TRIGGER FIRED -> QueueDrainer.drain(triggerSource)
+  -> if (!this.handler) return null;
+  -> (QueueManager.drainQueue is NEVER called)
+  -> No Web Lock or lease acquired
+  -> No queue items claimed or inspected
+  -> Zero state transitions (items remain PENDING)
+  -> Zero attempts consumed (attempts: 0 preserved)
+  -> Zero backoff or timestamp alterations
+  -> Zero crash counter increments
+  -> Zero GitHub API requests
+  -> Returns null safely
+```
+
+---
+
+### 5. Handler-Unavailable Behavior
+When `this.handler === undefined`:
+- `drain()` logs an informational skip message and immediately returns `null`.
+- `QueueManager.drainQueue` is **not** called.
+- No durable or memory queue state is modified.
+- No fake `SyncResult` is generated.
+- No item transitions to `FAILED`.
+- The queue remains completely intact until Phase 1C.4.2.2 installs the real synchronization handler.
+
+---
+
+### 6. Security Wording / Invariant Correction
+Replaced inaccurate claims that content scripts "cannot message the service worker" with the authoritative extension security model:
+
+```
+UNTRUSTED PAGE / CONTENT SCRIPT
+              |
+              v
+   VALIDATED EXTENSION MESSAGE
+              |
+              v
+   SERVICE-WORKER AUTHORIZATION
+              |
+              v
+   PERMITTED OPERATION ONLY
+```
+
+- Content scripts communicate with the service worker exclusively via extension messaging (`browser.runtime.sendMessage`).
+- The security guarantee is enforced by:
+  1. Strict message envelope validation (schema, type allowlist, nonce replay defense).
+  2. Authoritative service-worker sender verification (sender tab origin validation).
+  3. Strict isolation: callers have zero direct access to `QueueManager`, `QueueDrainer`, Web Locks, or local storage.
+
+---
+
+### 7. Tests Added
+In [`tests/security/queue-drainer.test.ts`](file:///d:/Parth/Projects/CodeSync/tests/security/queue-drainer.test.ts):
+- **QD-SAFE-01**: No handler installed $\rightarrow$ `drain()` returns `null`; `QueueManager.drainQueue` is NOT called.
+- **QD-SAFE-02**: No handler installed with valid `PENDING` queue item $\rightarrow$ item remains `PENDING`; no state transition occurs.
+- **QD-SAFE-03**: No handler installed $\rightarrow$ `attempts` remain unchanged (0 attempts consumed).
+- **QD-SAFE-04**: No handler installed $\rightarrow$ `nextRetryAt` and backoff remain unchanged; `lastError` remains `undefined`.
+- **QD-SAFE-05**: No handler installed $\rightarrow$ poison-pill / crash accounting remains unchanged (`crashCount = 0`).
+- **QD-SAFE-06**: No handler installed $\rightarrow$ zero GitHub synchronization or network calls occur.
+- **QD-SAFE-07**: Real handler installed $\rightarrow$ `QueueDrainer` delegates normally to `QueueManager.drainQueue`.
+- **QD-SAFE-08**: Remove/unset handler after installation $\rightarrow$ subsequent drain safely becomes a no-op returning `null`.
+- **QD-SAFE-09**: Multiple concurrent drain triggers without a handler $\rightarrow$ all safely return `null` without queue mutation.
+- **QD-SAFE-10**: Security invariant verified $\rightarrow$ untrusted callers cannot access `QueueDrainer` or `QueueManager` globals; message validation and service worker authorization enforced.
+
+---
+
+### 8. Total Test Count and Pass/Fail Result
+- **Test Files**: 33 passed (33 total)
+- **Tests**: **400 passed** (400 total)
+- **Failures**: **0**
+
+---
+
+### 9. TypeScript Result
+- Command: `npm run compile` (`tsc --noEmit`)
+- Result: **Passed (0 errors)**
+
+---
+
+### 10. ESLint Result
+- Command: `npm run lint` (`eslint .`)
+- Result: **Passed (0 errors, 0 warnings)**
+
+---
+
+### 11. Prettier Result
+- Command: `npm run format:check` (`prettier --check "**/*.{ts,tsx,json,html,css}"`)
+- Result: **Passed (All files matched Prettier code style)**
+
+---
+
+### 12. Chrome Build Result
+- Command: `npm run build` (`wxt build`)
+- Output: `.output/chrome-mv3`
+- Result: **Passed (Finished in 2.25s, bundle size 297.89 kB)**
+
+---
+
+### 13. Firefox Build Result
+- Command: `npm run build:firefox` (`wxt build -b firefox`)
+- Output: `.output/firefox-mv3`
+- Result: **Passed (Finished in 1.79s, bundle size 297.88 kB)**
+
+---
+
+### 14. Permission Audit
+- `permissions`: Strictly `["storage", "alarms"]`.
+- `host_permissions`: Strictly `["https://github.com/*", "https://api.github.com/*"]`.
+- Zero broad permissions (`<all_urls>`, `webRequest`, `tabs`, `cookies` are absent).
+- No new permissions added.
+
+---
+
+### 15. Confirmation That NO GitHub Synchronization Handler Was Implemented
+**Confirmed**: No real GitHub queue synchronization handler was implemented. `QueueDrainer` only contains the fail-closed delegation harness.
+
+---
+
+### 16. Confirmation That Phase 1C.4.2.2 Remains Untouched
+**Confirmed**: Phase 1C.4.2.2 (GitHub API synchronization handler integration) remains completely untouched and has not been started.
+
+---
+
+### 17. Remaining Findings
+- **P0**: None.
+- **P1**: None.
+- **P2**: None.
+- **P3**: None.
+
+---
+
+### FINAL STATUS
+**CORRECTION COMPLETE — READY FOR REVIEW**

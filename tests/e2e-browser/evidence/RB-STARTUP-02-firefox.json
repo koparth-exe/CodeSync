@@ -1,0 +1,25 @@
+{
+  "testId": "RB-STARTUP-02",
+  "browser": "firefox",
+  "browserVersion": "155.0",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:53.160Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "extensionId": "codesync@extension.local",
+    "backgroundActive": true,
+    "browsingContextReady": true
+  },
+  "relevantStorageState": {
+    "manifestBackgroundType": "scripts",
+    "geckoStorageInitialized": true,
+    "extensionStorageDirPresent": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "FIREFOX_BACKGROUND_INITIALIZATION",
+    "FIREFOX_EVENT_PAGE_LIFECYCLE",
+    "FIREFOX_GECKO_STORAGE_CREATION"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "testId": "RB-PERSIST-02",
+  "browser": "firefox",
+  "browserVersion": "155.0",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:38.322Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "profileDir": "C:\\Users\\Tejasvini\\AppData\\Local\\Temp\\codesync-ff-persist-HLyRs4",
+    "restartedWithSameProfile": true
+  },
+  "relevantStorageState": {
+    "firefoxStorageDirectoryPresent": true,
+    "webExtensionStoragePreserved": true
+  },
+  "relevantIndexedDBState": {
+    "geckoIdbSqlitePresent": true,
+    "geckoIdbSqliteSurviving": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "FIREFOX_GECKO_INDEXEDDB_INITIALIZATION",
+    "FIREFOX_STORAGE_LOCAL_SQLITE_PERSISTENCE",
+    "FIREFOX_PROFILE_SHUTDOWN_DURABILITY"
+  ]
+}

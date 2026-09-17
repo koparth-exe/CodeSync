@@ -1,0 +1,287 @@
+Ran command: `npm test`
+Used tool: manage_task
+Ran command: `npm run compile; npm run lint; npm run format:check`
+Used tool: manage_task
+Ran command: `npm run build; npm run build:firefox`
+Used tool: manage_task
+Ran command: `Test-Path tests\security\persistent-lease-fencing.test.ts`
+Created persistent-lease-fencing.test.ts
+Ran command: `npx vitest run tests/security/persistent-lease-fencing.test.ts`
+Created persistent-lease-fencing.test.ts
+Ran command: `npx vitest run tests/security/persistent-lease-fencing.test.ts`
+Created persistent-lease-fencing.test.ts
+Ran command: `npx vitest run tests/security/persistent-lease-fencing.test.ts`
+Ran command: `npm test`
+Used tool: manage_task
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Edited persistent-lease-fencing.test.ts
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npx prettier --write tests/security/persistent-lease-fencing.test.ts`
+Ran command: `npm run format:check`
+Ran command: `npm run build; npm run build:firefox`
+Used tool: manage_task
+Ran command: `npm test`
+Used tool: manage_task
+Ran command: `Get-ChildItem -Recurse -File src/ | Where-Object { $_.LastWriteTime -gt (Get-Date "2026-09-15 12:00:00") } | Select-Object LastWriteTime, Length, FullName`
+Ran command: `Get-ChildItem -Recurse -File | Where-Object { $_.LastWriteTime -gt (Get-Date "2026-09-15 12:30:00") -and $_.FullName -notmatch "node_modules|\.output|\.wxt" } | Select-Object LastWriteTime, Length, FullName`
+
+# Phase 1C.4.3.2.2.1 Implementation Report
+## Persistent Lease + Fencing Integration Tests
+
+---
+
+## 1. Executive Summary
+
+Phase 1C.4.3.2.2.1 implemented the four targeted integration tests identified during the Phase 1C.4.3.2.2.0 formal audit to close critical evidence gaps in persistent lease management, monotonic fencing, and mutation-boundary protection:
+
+1. **`FENCE-INT-01`**: Monotonic fencing token succession across three successive worker generations ($1 \to 2 \to 3$).
+2. **`FENCE-INT-02`**: Rejection of stale authority after orderly lease release, proving numeric token recycling to `1` cannot revive a stale worker because authority is bound to `(workerId, fencingToken, expiresAt)` and current durable state.
+3. **`FENCE-INT-03`**: Fail-closed rejection of a superseded worker at the handler-error mutation boundary ([src/shared/queue/manager.ts:L549](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L549)), preventing stale error persistence, attempt counter pollution, or bogus retry scheduling.
+4. **`FENCE-INT-04`**: Deterministic resolution of concurrent takeover attempts via Lamport-style Probe-and-Verify read-back when Tier 1 Web Locks are completely disabled.
+
+**Implementation Results:**
+- **Production Code Changes:** **0** (Zero lines changed in `src/`).
+- **Test Code Changes:** **+1 file** ([tests/security/persistent-lease-fencing.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts), 515 lines).
+- **Test Suite Results:** **471 passed** (100% pass rate across 37 test files; 0 failed, 0 skipped).
+- **Static & Build Gates:** TypeScript compilation (0 errors), ESLint (0 errors, 0 warnings), Prettier (matching style), and Chrome/Firefox MV3 production builds all **PASSED**.
+
+---
+
+## 2. Baseline
+
+Prior to implementing any changes, the repository was audited and verified against all quality gates:
+
+- **Baseline Test Count:** 467 passed (36 test files, 0 failed, 0 skipped).
+- **Baseline TypeScript Compilation (`tsc --noEmit`):** PASSED (0 errors).
+- **Baseline ESLint (`eslint .`):** PASSED (0 warnings, 0 errors).
+- **Baseline Formatting (`prettier --check`):** PASSED (All files match code style).
+- **Baseline Chrome MV3 Build (`wxt build`):** PASSED (349.22 kB bundle).
+- **Baseline Firefox MV3 Build (`wxt build -b firefox`):** PASSED (349.22 kB bundle).
+
+---
+
+## 3. Files Changed
+
+### Test Files
+- **[NEW]** [tests/security/persistent-lease-fencing.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts) (515 lines / 20.5 kB)
+  - Implements `FENCE-INT-01`, `FENCE-INT-02`, `FENCE-INT-03`, and `FENCE-INT-04`.
+
+### Test Helper Files
+- None (Reused [tests/helpers/crash-harness.ts](file:///d:/Parth/Projects/CodeSync/tests/helpers/crash-harness.ts) without modifications).
+
+### Production Files
+- **Zero (0) production files changed.** No files under `src/` were created, modified, or deleted.
+
+---
+
+## 4. FENCE-INT-01
+### Multi-Generation Lease Takeover
+
+- **Description:** `"preserves monotonically increasing fencing across three successive worker generations"`
+- **Setup:**
+  - Disabled `navigator.locks` to isolate Tier 2 persistent lease mechanics.
+  - Initialized virtual clock at `t = 1700000000000`.
+- **Worker Generations:**
+  - **Generation 1 (Worker A):** Booted from shared storage; acquired persistent lease with `fencingToken = 1`. Enqueued submission `two-sum`. Lease verified in `storage.local`. Worker A validated fence 1. Virtual time advanced by 35s ($t + 35\text{s}$) to expire lease.
+  - **Generation 2 (Worker B):** Booted as an independent service graph from shared storage. Reclaimed expired lease; incremented `fencingToken = 2`. Asserted Worker B cannot validate fence 1, and stale Worker A cannot validate fence 1. Virtual time advanced by 35s ($t + 70\text{s}$) to expire lease.
+  - **Generation 3 (Worker C):** Booted as a third independent service graph. Reclaimed expired lease; incremented `fencingToken = 3`.
+- **Fence Sequence:**
+  - $1 \to 2 \to 3$ ($1 < 2 < 3$). Monotonicity confirmed across three generations.
+- **Assertions:**
+  1. Worker A receives fence 1 (`acqA.fencingToken === 1`).
+  2. Worker B receives fence 2 (`acqB.fencingToken === 2`).
+  3. Worker C receives fence 3 (`acqC.fencingToken === 3`).
+  4. Sequence is strictly monotonic ($1 < 2 < 3$).
+  5. Worker B cannot validate Worker A's fence (throws [StaleLeaseError](file:///d:/Parth/Projects/CodeSync/src/shared/errors/index.ts)).
+  6. Worker C cannot validate Worker B's fence (throws `StaleLeaseError`).
+  7. Stale Worker A cannot validate after Worker C is authoritative (throws `StaleLeaseError`).
+  8. Stale Worker B cannot validate after Worker C is authoritative (throws `StaleLeaseError`).
+  9. Worker C is the sole authoritative owner (`validateFencingToken(workerC.workerId, 3)` succeeds).
+  10. Durable storage contains Worker C's lease with token 3.
+  11. Reference inequality confirmed across all three workers (`workerA !== workerB !== workerC`).
+- **Result:** **PASSED**
+
+---
+
+## 5. FENCE-INT-02
+### Orderly Release + Token Recycling
+
+- **Description:** `"rejects stale authority after orderly release even when a new session reuses the same numeric fencing token"`
+- **Setup:**
+  - Disabled `navigator.locks`.
+  - Initialized virtual clock at `t = 1700000000000`.
+- **Orderly Release & Token Reuse:**
+  - **Session 1 (Worker A):** Acquired lease with `fencingToken = 1`. Retained `workerAId` and `fenceA = 1`. Completed queue operations and called `workerA.concurrency.releaseLease(workerAId, 1)`.
+  - **Storage State:** Verified that `STORAGE_KEYS.QUEUE_LEASE` was removed from `storage.local`.
+  - **Session 2 (Worker B):** Started 5 minutes later ($t + 300\text{s}$) as an independent session. Calling `acquirePersistentLease` returned `fencingToken = 1` because the previous lease was orderly cleared.
+- **Stale Worker A Attempts:**
+  1. **Validation Attempt:** Worker A called `validateFencingToken(workerAId, 1)`. Storage holds `workerB.workerId`. Rejected fail-closed with `StaleLeaseError`.
+  2. **Release Attempt:** Worker A called `releaseLease(workerAId, 1)`. Storage checked `existing.workerId === workerAId`. Because `workerB.workerId` was present, the release was a no-op. Worker B's lease remained completely intact.
+  3. **Heartbeat Renewal Attempt:** Worker A called `renewHeartbeat(workerAId, 1)`. Storage checked `existing.workerId === workerAId`. Returned `false`. Worker B's lease was not modified.
+  4. **Worker B Authority:** Worker B's validation with `(workerB.workerId, 1)` remained fully authoritative.
+  5. **Empty Storage Rejection:** When Worker B eventually released its lease, Worker A attempted validation again against empty storage (`!existing`). Rejected fail-closed with `StaleLeaseError`.
+- **Assertions:**
+  1. Worker A originally owned fence 1.
+  2. Worker A released lease successfully and durable lease was removed.
+  3. Worker B independently acquired lease and legitimately received fence 1.
+  4. Worker A's old authority cannot be revived despite matching numeric fence.
+  5. Worker A validation fails closed with `StaleLeaseError`.
+  6. Worker A cannot release Worker B's lease.
+  7. Worker A cannot renew Worker B's lease.
+  8. Worker B's lease remains intact after all stale Worker A attempts.
+- **Result:** **PASSED**
+
+---
+
+## 6. FENCE-INT-03
+### Stale Worker Error / Failure Mutation Boundary
+
+- **Description:** `"rejects superseded worker at the handler-error mutation boundary"`
+- **Setup:**
+  - Disabled `navigator.locks`.
+  - Initialized virtual clock at `t = 1700000000000`.
+- **Handler Failure Race & Worker B Supersession:**
+  - Worker A enqueued a candidate item (`two-sum`). Item claimed into `PROCESSING` under fence 1.
+  - Controlled failure injection: Paused Worker A inside `onBeforePreFlightGet` on a Promise barrier, configured to throw an unhandled network error (`"GitHub API transport failure: Connection reset by peer mid-flight"`) once resumed.
+  - Worker A's drain started asynchronously: `drainPromiseA = workerA.queueDrainer.drain("submission_event")`.
+  - Virtual time advanced by 35s ($t + 35\text{s}$) to expire Worker A's lease.
+  - Worker B booted from shared storage, detected expired lease, acquired fence 2, recovered the item, and completed synchronization to `COMPLETED` with commit SHA.
+- **Error-Path Mutation Boundary Execution:**
+  - Worker A's barrier was released (`unpauseWorkerA()`).
+  - Worker A resumed, threw the transport error inside `handler`, and entered the `catch (err)` block in [QueueManager.drainQueue:L547](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L547).
+  - Line 549 executed: `await this.concurrency.validateFencingToken(workerId, fencingToken)`.
+  - Fencing check detected Worker B's lease with fence 2.
+  - Worker A threw `StaleLeaseError` fail-closed, aborting before reaching lines 550–565.
+- **Assertions:**
+  1. Worker A started with fence 1; Worker B superseded with fence 2.
+  2. Worker A entered real `QueueManager.drainQueue` catch path upon handler failure.
+  3. Worker A's drain rejected with `StaleLeaseError`.
+  4. Worker A did NOT write `FAILED` state (queue item remained `COMPLETED`).
+  5. Worker A did NOT increment `attempts` (remained 0).
+  6. Worker A did NOT set `lastError` with `INVARIANT_VIOLATION` (remained `undefined`).
+  7. Worker A did NOT schedule any retry (`nextRetryAt` remained `undefined`).
+  8. Worker B's commit SHA and state remained completely uncorrupted.
+  9. Zero extra sync history entries created (history length strictly 1).
+- **Result:** **PASSED**
+
+---
+
+## 7. FENCE-INT-04
+### Pure Tier-2 Concurrent Takeover Without Web Locks
+
+- **Description:** `"Probe-and-Verify resolves concurrent takeover attempts without Web Locks"`
+- **Setup:**
+  - Disabled `navigator.locks` (`Object.defineProperty(globalThis.navigator, "locks", { value: undefined })`).
+  - Seeded an expired lease in `storage.local` with `fencingToken = 5` and `expiresAt = virtualTime - 10_000`.
+  - Created two independent worker instances from shared storage: Worker B and Worker C (`workerB !== workerC`).
+- **Controlled Interleaving & Probe-and-Verify Behavior:**
+  - Worker B initiated `acquirePersistentLease(workerB.workerId, "alarm")`.
+  - Worker B read the expired lease (token 5) and computed `nextFencingToken = 6`.
+  - Worker B reached [onBeforeCommit](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L68).
+  - While Worker B was paused before write, Worker C executed `acquirePersistentLease(workerC.workerId, "startup")`.
+  - Worker C committed candidate lease `{ workerId: workerC.workerId, fencingToken: 6 }` and verified read-back (`acqC.acquired === true`).
+  - Worker B resumed and executed pre-commit check ([concurrency.ts:L73](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L73)): observed Worker C's active lease.
+  - Worker B yielded cleanly with `acquired: false`, `fencingToken: 6`, and `reason: "Interleaving lease acquired by worker..."`.
+- **Winner / Loser Semantics:**
+  - Exactly ONE worker (Worker C) became authoritative.
+  - Losing worker (Worker B) yielded cleanly according to the API contract without throwing.
+  - Durable lease in storage belonged solely to Worker C (`fencingToken: 6`).
+  - Worker C validated successfully (`validateFencingToken` resolved).
+  - Worker B was rejected fail-closed (`validateFencingToken` threw `StaleLeaseError`).
+- **Assertions:**
+  1. Web Locks genuinely disabled.
+  2. Both workers entered persistent lease acquisition path.
+  3. Pre-commit check prevented duplicate lease creation.
+  4. Exactly ONE worker became authoritative (Worker C).
+  5. Winning worker received next fencing token (6).
+  6. Losing worker received `acquired: false` and did not claim ownership.
+  7. Storage contains exactly one lease.
+  8. Zero queue mutations originated from losing worker.
+- **Result:** **PASSED**
+
+---
+
+## 8. Fresh Worker / Durable State Evidence
+
+All four tests enforced genuine execution context independence through [createCrashTestEnvironment](file:///d:/Parth/Projects/CodeSync/tests/helpers/crash-harness.ts#L241):
+1. **Shared Durable Store:** All workers shared identical underlying [MemoryStorageDriver](file:///d:/Parth/Projects/CodeSync/tests/helpers/e2e-harness.ts) (`chrome.storage.local`) and [MemoryPayloadStorageDriver](file:///d:/Parth/Projects/CodeSync/src/shared/storage/indexeddb.ts) (IndexedDB).
+2. **Disjoint Class Graphs:** Each call to `env.createWorker()` instantiated completely new, unshared instances of:
+   - `StorageService`
+   - `PayloadStorage`
+   - `QueueConcurrencyManager`
+   - `QueueManager`
+   - `QueueDrainer`
+   - `GitHubContentsService`
+3. **Reference Disjointness Assertions:**
+   - In `FENCE-INT-01`: `workerA.queueManager !== workerB.queueManager !== workerC.queueManager`
+   - In `FENCE-INT-02`: `workerA.concurrency !== workerB.concurrency`
+   - In `FENCE-INT-03`: `workerA.queueManager !== workerB.queueManager`
+   - In `FENCE-INT-04`: `workerB.concurrency !== workerC.concurrency`
+4. **No Shared Singletons:** Zero module-level singletons or in-memory authority flags were accessed across worker boundaries.
+
+---
+
+## 9. Security Validation
+
+1. **Mutation Authority vs Start-of-Operation Lease:**
+   - In `FENCE-INT-03`, Worker A possessed valid lease authority when claiming the queue item into `PROCESSING` at line 433.
+   - However, when Worker A's handler finished (failing mid-flight), its authority had been superseded by Worker B ($1 \to 2$).
+   - The test proves that `validateFencingToken` at line 549 strictly evaluated *current* authority at the mutation boundary, aborting fail-closed and preventing stale error persistence.
+2. **Token Recycling Defense:**
+   - In `FENCE-INT-02`, even though Worker B received the same numeric token (`1`) following Worker A's orderly release, Worker A's stale attempts failed because authority verification requires exact matching of the tuple `(workerId, fencingToken, expiresAt)`.
+3. **No Production Backdoors:**
+   - All failure injections and interleavings utilized existing test-only hooks (`onBeforeCommit`, `onBeforePreFlightGet`) without modifying production source code or weakening security checks.
+
+---
+
+## 10. Full Test Results
+
+- **Total Test Count:** **471 passed** (37 test files)
+- **Passed:** 471
+- **Failed:** 0
+- **Skipped:** 0
+- **Targeted Integration Results (`tests/security/persistent-lease-fencing.test.ts`):**
+  - `FENCE-INT-01: preserves monotonically increasing fencing across three successive worker generations` — **PASSED** (31ms)
+  - `FENCE-INT-02: rejects stale authority after orderly release even when a new session reuses the same numeric fencing token` — **PASSED** (2ms)
+  - `FENCE-INT-03: rejects superseded worker at the handler-error mutation boundary` — **PASSED** (24ms)
+  - `FENCE-INT-04: Probe-and-Verify resolves concurrent takeover attempts without Web Locks` — **PASSED** (2ms)
+
+---
+
+## 11. Build / Static Validation
+
+| Quality Gate | Command | Result | Details |
+|---|---|---|---|
+| **TypeScript Compilation** | `npm run compile` | **PASSED** | `tsc --noEmit` exited 0 (0 errors) |
+| **ESLint** | `npm run lint` | **PASSED** | `eslint .` exited 0 (0 warnings, 0 errors) |
+| **Prettier Check** | `npm run format:check` | **PASSED** | All matched files use Prettier style |
+| **Chrome MV3 Build** | `npm run build` | **PASSED** | Built extension in 1.277 s (349.22 kB bundle) |
+| **Firefox MV3 Build** | `npm run build:firefox` | **PASSED** | Built extension in 1.069 s (349.22 kB bundle) |
+
+---
+
+## 12. Production Change Assessment
+
+**Production source changes: 0**
+
+No files under `src/` were modified. The production implementation of [QueueConcurrencyManager](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts) and [QueueManager](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts) fully satisfied all four adversarial integration scenarios without alteration.
+
+---
+
+## 13. Remaining Gaps
+
+1. **Real-Browser Background SW Suspension:**
+   - Vitest test runs with simulated virtual clocks prove the algorithm and storage state transitions.
+   - However, OS-level Chrome/Firefox process suspension under real-world low-memory conditions is not verified by Vitest mocks alone and will be evaluated during Phase 2 end-to-end browser runtime validation.
+2. **IndexedDB Compaction / Quota Pressure:**
+   - Storage driver tests use in-memory emulators; extreme browser IndexedDB quota eviction behavior remains a manual/end-to-end testing concern.
+
+---
+
+## 14. Final Recommendation
+
+### **APPROVE**
+
+All four required integration scenarios (`FENCE-INT-01` through `FENCE-INT-04`) are implemented, passing, and verified against all static and build quality gates. Zero production code changes were required. The persistent lease, Web Lock coordination, and monotonic fencing recovery subsystem is conclusively validated and ready for review.

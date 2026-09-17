@@ -1,0 +1,302 @@
+Viewed contents-service.ts:345-380
+Viewed contents-service.ts:320-410
+Viewed client.ts:100-160
+Searched for "GitHubRateLimitError"
+Viewed client.ts:240-305
+Viewed types.ts:70-130
+Searched for "class GitHubRateLimitError"
+Viewed index.ts:280-340
+Viewed contents-service.ts:1-45
+Viewed github-handler.ts:190-260
+Viewed github-handler.ts:380-460
+Viewed github-handler.ts:461-560
+Viewed manager.ts:415-480
+Viewed manager.ts:510-560
+Searched for "reconcileUncertainWrite"
+Viewed contents-service.ts:360-400
+Viewed contents-service.ts:480-585
+Viewed contents-service.ts:430-480
+Viewed contents-service.ts:150-230
+Viewed contents-service.ts:295-375
+Searched for "configureRateLimit"
+Searched for "rateLimit"
+Searched for "429"
+Searched for "E2E-07"
+Viewed pipeline-e2e.test.ts:420-500
+Viewed pipeline-e2e.test.ts:501-580
+Viewed mock-github-api.ts:120-180
+Viewed mock-github-api.ts:181-260
+Viewed mock-github-api.ts:260-320
+Viewed mock-github-api.ts:350-450
+Viewed contents-service.ts:1-15
+Viewed contents-service.ts:360-375
+Edited contents-service.ts
+Viewed mock-github-api.ts:540-565
+Viewed pipeline-e2e.test.ts:900-930
+Viewed pipeline-e2e.test.ts:1-25
+Edited pipeline-e2e.test.ts
+Viewed pipeline-e2e.test.ts:920-931
+Edited pipeline-e2e.test.ts
+Ran command: `npx vitest run tests/security/pipeline-e2e.test.ts`
+Viewed e2e-harness.ts:1-100
+Viewed e2e-harness.ts:101-150
+Edited pipeline-e2e.test.ts
+Edited pipeline-e2e.test.ts
+Ran command: `npx vitest run tests/security/pipeline-e2e.test.ts`
+Viewed pipeline-e2e.test.ts:185-205
+Viewed pipeline-e2e.test.ts:205-220
+Edited pipeline-e2e.test.ts
+Ran command: `npx vitest run tests/security/pipeline-e2e.test.ts`
+Ran command: `npx vitest run tests/security/storage-and-wal.test.ts tests/security/queue-concurrency.test.ts tests/security/wal-crash-boundaries.test.ts tests/security/concurrency-fencing.test.ts`
+Ran command: `npx vitest run tests/security/failure-injection.test.ts tests/security/auth-device-flow.test.ts tests/security/github-path-security.test.ts`
+Ran command: `npm test`
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Viewed pipeline-e2e.test.ts:1075-1095
+Edited pipeline-e2e.test.ts
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+Ran command: `npx vitest run tests/security/pipeline-e2e.test.ts`
+Viewed contents-service.ts:1-15
+Viewed contents-service.ts:355-380
+Created walkthrough.md
+
+# CODE SYNC — PHASE 1C.4.3.1 CORRECTION REPORT
+## P2 Rate-Limit / Uncertain-Write Classification Hardening
+
+---
+
+## 1. Root Cause
+
+In [`src/shared/errors/index.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/errors/index.ts#L294), `GitHubRateLimitError` inherits from `GitHubApiError` and explicitly sets `isRetryable: true`.
+
+In [`src/shared/github/contents-service.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts#L364), the write loop in `synchronizeFile` caught errors from `this.client.createOrUpdateFile(...)` and evaluated:
+
+```typescript
+if (
+  err instanceof GitHubApiError &&
+  (err.isRetryable ||
+    err.message.includes("timed out") ||
+    err.message.includes("Network failure"))
+) {
+  // Reconcile before assuming write failed
+  const reconciled = await this.reconcileUncertainWrite(
+    owner,
+    repo,
+    branch,
+    targetPath,
+    localContentHash,
+  );
+  ...
+  throw new GitHubWriteOutcomeUnknownError(...);
+}
+```
+
+Because `err instanceof GitHubApiError` and `err.isRetryable === true` both held true for `GitHubRateLimitError`, an explicit **HTTP 429** received during a `PUT` request was misclassified as an uncertain write. Consequently:
+1. It invoked `this.reconcileUncertainWrite(...)`, issuing an unnecessary post-write `GET` request.
+2. When reconciliation established the write did not commit (as expected for a 429), it threw `GitHubWriteOutcomeUnknownError`.
+3. In [`src/shared/queue/github-handler.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L540), `GitHubWriteOutcomeUnknownError` forced the queue item into `status: "requires_attention"` with `retryable: false`.
+4. This bypassed the dedicated `if (err instanceof GitHubRateLimitError)` catch block in `GitHubQueueSyncHandler`, quarantined the item permanently, and ignored the server's `Retry-After` / `resetTimestamp` backoff instruction.
+
+---
+
+## 2. Correction
+
+A surgical classification check was added directly preceding the Step 11 uncertain-write handler in [`src/shared/github/contents-service.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts#L363-L371):
+
+```typescript
+// --------------------------------------------------------------------
+// Explicit Rate-Limit Handling (HTTP 429 / 403 secondary)
+// --------------------------------------------------------------------
+// If the error is an explicit HTTP rate limit, the outcome is authoritatively
+// known: the write was rejected and did NOT commit. Bubble immediately so
+// QueueManager can schedule a retry with the server-dictated Retry-After delay.
+// MUST NOT be treated as an uncertain write outcome or trigger reconciliation.
+if (err instanceof GitHubRateLimitError) {
+  throw err;
+}
+```
+
+This preserves the fundamental invariant:
+$$\mathbf{HTTP\ Response\ (Known\ Rejection)} \neq \mathbf{Transport\ Failure\ (Outcome\ Uncertain)}$$
+
+1. **Explicit HTTP 429**: Re-thrown immediately. `GitHubQueueSyncHandler` catches it, sets `status: "failed"`, `retryable: true`, and propagates `resetTimestamp` / `retryAfterSeconds`. `QueueManager` calculates `effectiveDelay = max(backoffDelay, rateLimitDelay)` and schedules `item.nextRetryAt`.
+2. **Network / Socket Drop / Timeout during PUT**: Does not match `GitHubRateLimitError`. Falls through to `reconcileUncertainWrite(...)` to inspect remote state safely.
+
+---
+
+## 3. Files Changed
+
+### Production
+- [`src/shared/github/contents-service.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts):
+  - Added `GitHubRateLimitError` to imports from `../errors`.
+  - Added explicit `if (err instanceof GitHubRateLimitError) throw err;` guard prior to Step 11 uncertain-write block.
+
+### Tests
+- [`tests/security/pipeline-e2e.test.ts`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts):
+  - Added regression test suite covering scenarios `PUT-429-01`, `PUT-429-02`, `PUT-429-03`, `PUT-429-04`, and `UNCERTAIN-PUT-REGRESSION-01`.
+
+### Test Helpers
+- None (existing `MockGitHubServer.configure429RateLimit` and `MemoryStorageDriver` in `tests/helpers/mock-github-api.ts` and `tests/helpers/e2e-harness.ts` supported PUT rate limiting and durable assertions).
+
+---
+
+## 4. Behavioral Before / After
+
+| Scenario | Behavior Before Correction | Behavior After Correction |
+| :--- | :--- | :--- |
+| **PUT 429** | Treated as uncertain write $\rightarrow$ issued reconciliation GET $\rightarrow$ threw `GitHubWriteOutcomeUnknownError` $\rightarrow$ item erroneously quarantined to `REQUIRES_ATTENTION` (`retryable: false`). | Recognized as explicit known rate limit $\rightarrow$ zero reconciliation GETs issued $\rightarrow$ bubbles as `GitHubRateLimitError` $\rightarrow$ item transitions to `FAILED` with `nextRetryAt` incorporating `Retry-After`. Retries cleanly upon timer expiry. |
+| **GET 429** | Bubbled to `GitHubQueueSyncHandler` $\rightarrow$ scheduled retry in `QueueManager`. | **Unchanged**. Continues to bubble directly and schedule retry based on `Retry-After`. |
+| **PUT network failure** | Caught by uncertain-write handler $\rightarrow$ reconciliation GET checked remote hash $\rightarrow$ confirmed if hash matched; quarantined if uncommitted/mismatched. | **Unchanged**. Network transport disruptions continue to trigger reconciliation; zero blind retries. |
+| **PUT timeout** | Caught by uncertain-write handler $\rightarrow$ reconciliation GET checked remote hash. | **Unchanged**. Timeout errors continue to execute safe reconciliation. |
+
+---
+
+## 5. Regression Tests
+
+| ID | Scenario | Result |
+| :--- | :--- | :--- |
+| **PUT-429-01** | Explicit PUT 429 is recognized as known rate limit; does not invoke uncertain-write reconciliation or issue reconciliation GETs | **PASS** |
+| **PUT-429-02** | Queue schedules retry on PUT 429 without entering uncertain-write quarantine; early drain before delay safely skips | **PASS** |
+| **PUT-429-03** | Retry succeeds cleanly after rate-limit expiry with zero redundant reconciliation calls; sync history recorded | **PASS** |
+| **PUT-429-04** | Rate-limit Retry-After delay dominates shorter exponential backoff delay (`effectiveDelay = max(backoff, rateLimit)`) | **PASS** |
+| **UNCERTAIN-PUT-REGRESSION-01** | Genuine transport uncertainty during PUT still enters reconciliation path (Case A commits on match; Case B quarantines on missing commit) | **PASS** |
+
+---
+
+## 6. Request Trace Verification
+
+### Scenario A: PUT 429 (Single Attempt)
+```
+1. GET_REPOSITORY        -> 200 OK
+2. GET_BRANCH            -> 200 OK
+3. GET_FILE              -> 404 Not Found (Pre-flight check)
+4. PUT_FILE_429          -> 429 Rate Limit (Retry-After: 60)
+[Drain stops immediately. Zero reconciliation GET issued.]
+```
+
+### Scenario B: PUT 429 followed by Successful Retry (E2E Path)
+```
+--- Attempt 1 (Initial Drain) ---
+1. GET_REPOSITORY        -> 200 OK
+2. GET_BRANCH            -> 200 OK
+3. GET_FILE              -> 404 Not Found
+4. PUT_FILE_429          -> 429 Rate Limit (Retry-After: 60)
+[Item state: FAILED, nextRetryAt: virtualTime + 60,000 ms]
+
+--- Timer Advance (+65s) & Attempt 2 (Alarm Trigger) ---
+5. GET_REPOSITORY        -> 200 OK
+6. GET_BRANCH            -> 200 OK
+7. GET_FILE              -> 404 Not Found
+8. PUT_FILE              -> 200 OK (Commit generated)
+9. GET_FILE_VERIFY       -> 200 OK (Verification CONFIRMED)
+[Item state: COMPLETED, SyncHistory: status "synced"]
+```
+
+### Scenario C: Genuine Transport Uncertainty (Unchanged Safety Invariant)
+```
+1. GET_REPOSITORY        -> 200 OK
+2. GET_BRANCH            -> 200 OK
+3. GET_FILE              -> 404 Not Found
+4. PUT_FILE              -> Network Failure / Socket Drop
+5. GET_FILE              -> Reconciliation GET inspecting remote content hash
+[Remote match -> COMPLETED; Remote missing/mismatch -> REQUIRES_ATTENTION]
+```
+
+---
+
+## 7. Security & Invariant Verification
+
+1. **Zero Blind Retries**: When an HTTP 429 is received, CodeSync does not assume the write outcome was unknown. It knows with certainty that GitHub rejected the write request before creating a commit. The scheduled retry is a standard idempotent re-attempt of the pending queue item, preceded by normal pre-flight OCC validation (`GET_REPOSITORY`, `GET_BRANCH`, `GET_FILE`).
+2. **OCC Protection Intact**: If a concurrent write committed during the rate-limit backoff window, the retried attempt’s pre-flight `GET_FILE` detects the new remote SHA or matching content hash, triggering duplicate policy resolution or OCC conflict handling rather than an overwrite.
+3. **Uncertain-Write Safety Preserved**: As proven by `UNCERTAIN-PUT-REGRESSION-01`, socket drops and transport failures on `PUT` continue to invoke `reconcileUncertainWrite`. Rate-limit exclusion is restricted strictly to `GitHubRateLimitError`.
+4. **Zero Secret Leakage**: Rate-limit error payloads and queue records store only timestamps, attempt counts, and standard HTTP error codes. Tokens and credentials remain strictly scrubbed.
+
+---
+
+## 8. Test Results
+
+- **Baseline Tests**: 442 passed
+- **Phase 1C.4.3.1 Initial Tests**: +14 passed (456 total)
+- **Phase 1C.4.3.1 Correction Tests**: +5 passed (PUT-429-01 through 04, UNCERTAIN-PUT-REGRESSION-01)
+- **Final Total Tests**: **461 passed** across 35 test files
+- **Failed Tests**: **0**
+- **Skipped Tests**: **0**
+
+---
+
+## 9. Quality Gates
+
+```bash
+$ npm test
+Test Files  35 passed (35)
+     Tests  461 passed (461)
+  Duration  4.80s
+[Exit Code 0]
+
+$ npm run compile
+tsc --noEmit
+[Exit Code 0]
+
+$ npm run lint
+eslint .
+[Exit Code 0]
+
+$ npm run format:check
+prettier --check "**/*.{ts,tsx,json,html,css}"
+All matched files use Prettier code style!
+[Exit Code 0]
+
+$ npm run build
+wxt build
+√ Built extension in 589 ms (.output/chrome-mv3)
+[Exit Code 0]
+
+$ npm run build:firefox
+wxt build -b firefox
+√ Built extension in 526 ms (.output/firefox-mv3)
+[Exit Code 0]
+
+$ npx vitest run tests/security/pipeline-e2e.test.ts
+Test Files  1 passed (1)
+     Tests  19 passed (19)
+  Duration  1.65s (tests 129ms)
+[Exit Code 0]
+```
+
+---
+
+## 10. Diff Scope Verification
+
+All changes were strictly limited to the targeted problem:
+- **Production Changes**:
+  - Exactly 1 production file modified: [`src/shared/github/contents-service.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts) (+12 lines: 1 import, 10 lines documentation/guard).
+  - 0 changes to authentication, queue architecture, WAL, storage drivers, platform adapters, or manifest permissions.
+- **Test Changes**:
+  - Exactly 1 test file modified: [`tests/security/pipeline-e2e.test.ts`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts) (+5 targeted regression tests).
+- **Formatting**:
+  - Full codebase complies with Prettier and ESLint.
+
+---
+
+## 11. Remaining Findings
+
+| Severity | Issue | Status |
+| :--- | :--- | :--- |
+| **P0** | None | N/A |
+| **P1** | None | N/A |
+| **P2** | `GitHubRateLimitError` on PUT misclassified as uncertain write | **RESOLVED & VERIFIED** |
+| **P3** | None | N/A |
+| **INFO** | None | All pipeline invariants verified |
+
+---
+
+## 12. Final Gate Recommendation
+
+$$\mathbf{APPROVE\ 1C.4.3.2}$$
+
+The P2 rate-limit / uncertain-write classification issue has been resolved with minimal, surgical production code. Full pipeline verification is intact, and all 461 tests across 35 test suites pass deterministically.
+
+*(Hard stop per Section 19: Implementation paused. Downstream Phase 1C.4.3.2 will not proceed without explicit instruction.)*

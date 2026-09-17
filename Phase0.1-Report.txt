@@ -1,0 +1,360 @@
+================================================================================
+CODE SYNC — PHASE 0.1 FINAL REPORT
+SECURITY & ARCHITECTURE HARDENING GATE
+================================================================================
+
+Date: 2026-09-13
+Phase: Phase 0.1 (Security & Architecture Hardening Gate)
+Status: COMPLETED (Awaiting Human / ChatGPT Review and Sign-Off)
+Implementation Status: ZERO implementation files created (Pure Documentation Gate)
+
+================================================================================
+1. PHASE 0.1 STATUS
+================================================================================
+Phase 0.1 is COMPLETE.
+All architectural specifications, threat models, security controls, data models,
+and testing strategies have been formally hardened, aligned with the principle of
+defense-in-depth and least privilege, and cross-audited for complete consistency.
+The workspace remains strictly a documentation-only repository awaiting human
+and ChatGPT architectural review before Phase 1 begins.
+
+================================================================================
+2. FILES INSPECTED
+================================================================================
+The entire workspace and documentation corpus was critically inspected:
+- README.md
+- Phase0-Report.txt
+- Phase0.1-Report.txt (previous draft)
+- walkthrough-Phase0.md
+- docs/SRS.md
+- docs/ARCHITECTURE.md
+- docs/TECH-STACK.md
+- docs/GITHUB-INTEGRATION.md
+- docs/PLATFORM-ADAPTER-SPEC.md
+- docs/DATA-MODEL.md
+- docs/QUEUE-DESIGN.md
+- docs/PATH-TEMPLATE-SPEC.md
+- docs/SECURITY.md
+- docs/PRIVACY.md
+- docs/TESTING-STRATEGY.md
+- docs/COMPETITOR-ANALYSIS.md
+- docs/BROWSER-COMPATIBILITY.md
+- docs/ROADMAP.md
+- docs/ADR/ADR-0001-local-first-architecture.md
+- docs/ADR/ADR-0002-wxt-extension-framework.md
+- docs/ADR/ADR-0003-github-oauth-device-flow.md
+- docs/ADR/ADR-0004-layered-extraction-strategy.md
+- docs/ADR/ADR-0005-persistent-queue-storage.md
+- docs/ADR/ADR-0006-path-template-engine.md
+- docs/ADR/ADR-0007-content-hashing-dedup.md
+
+================================================================================
+3. FILES CREATED
+================================================================================
+No new documentation files were required; all hardenings and specifications were
+consolidated directly into the established documentation hierarchy to prevent
+fragmentation.
+
+================================================================================
+4. FILES MODIFIED
+================================================================================
+1.  docs/SECURITY.md
+    - Expanded into comprehensive 26-scenario threat model (Scenarios A through Z).
+    - Explicit trust boundaries (Zone 0 Untrusted, Zone 1 Trusted Core, Zone 2 GitHub).
+    - Hardened least-privilege permission matrix and prohibited permission list.
+    - Strict Content Security Policy (script-src 'self', object-src 'none').
+    - Fail-closed invariant matrix and credential/source redaction policy.
+2.  docs/GITHUB-INTEGRATION.md
+    - Replaced legacy OAuth App design with GitHub App Device Authorization Flow.
+    - Fine-grained repository Contents permissions scoped to user-selected repositories.
+    - 8-hour token lifecycle with automatic 6-month refresh token rotation.
+    - Demoted PAT to advanced/manual fallback with documented security risks.
+    - 10-step safe write pipeline with TOCTOU, optimistic lock, and 409 conflict retry.
+3.  docs/QUEUE-DESIGN.md
+    - Re-architected storage to Hybrid Partitioning: browser.storage.local (metadata,
+      locks, state indices) + IndexedDB (source payloads, sync history).
+    - Two-phase Write-Ahead Log (WAL) protocol.
+    - Concurrency control via distributed mutex with 30s TTL lock and heartbeat.
+    - Ephemeral service worker crash recovery and poison-pill isolation (max 3 crashes).
+4.  docs/PATH-TEMPLATE-SPEC.md
+    - Comprehensive 8-step deterministic path canonicalization pipeline.
+    - Multi-pass recursive URL decoding, Unicode NFKC normalization, null-byte rejection.
+    - Traversal defense against ../, ..\, Windows reserved device names, and .git escapes.
+    - Base repository folder containment enforcement and fail-closed path validation.
+5.  docs/PLATFORM-ADAPTER-SPEC.md
+    - Replaced universal network interception assumptions with a tailored 7-tier
+      safety hierarchy.
+    - Platform-specific extraction specifications for LeetCode, Codeforces, CodeChef, GFG.
+    - Defense against hostile platform metadata (titles, slugs, ratings, script tags).
+    - Explicit confidence scoring (threshold 0.70) and User-Assisted Recovery.
+    - Formalized Codolio status as deferred (portfolio aggregator, no judge).
+6.  docs/DATA-MODEL.md
+    - Updated AuthState with GitHub App user access tokens, refresh tokens, and installation ID.
+    - Updated NormalizedSubmission with targetRepository, targetBranch, and contentHash.
+    - Partitioned QueueItemMetadata (storage.local) from QueueItemPayload (IndexedDB).
+    - Enforced strict ExtensionMessage envelope (UUID v4 nonce, timestamp window, sender).
+    - Expanded CodeSyncError with error categories and failClosed booleans.
+7.  docs/ARCHITECTURE.md
+    - Aligned system topology with GitHub App, hybrid storage, and 10-step safe write.
+    - Trust boundary classification (Webpage != Trusted, Content Script != Trusted).
+    - Complete consistency audit across all components.
+8.  docs/SRS.md
+    - Removed all references to webRequest; replaced with content script observation.
+    - Updated authentication, storage, and fail-closed non-functional requirements.
+9.  docs/PRIVACY.md
+    - Documented source code memory residency and IndexedDB persistence lifecycle.
+    - Re-affirmed zero telemetry, zero analytics, zero external servers.
+    - Strict logging and diagnostics redaction.
+10. docs/BROWSER-COMPATIBILITY.md
+    - Documented Chromium service worker vs Firefox event page background lifecycles.
+    - IndexedDB cross-browser storage capabilities and ephemeral reconciliation.
+    - Common security model invariant across all browser tiers.
+11. docs/TECH-STACK.md
+    - Updated primary auth to GitHub App and storage to Hybrid Storage.
+    - Added Supply Chain Security section (lockfile pinning, npm audit, zero postinstall).
+12. docs/COMPETITOR-ANALYSIS.md
+    - Corrected inaccurate competitive claims; removed unsupported uniqueness claims.
+    - Provided evidence-based architectural differentiation.
+13. docs/TESTING-STRATEGY.md
+    - Formulated 17 mandatory security test suites (S1 through S17) for future phases.
+14. docs/ROADMAP.md
+    - Formalized Phase 0.1 completion and updated Phase 1 deliverables and gates.
+15. docs/ADR/ADR-0003-github-oauth-device-flow.md
+    - Amended to GitHub App with Device Flow & Fine-Grained Repository Permissions.
+16. docs/ADR/ADR-0004-layered-extraction-strategy.md
+    - Amended to platform-specific safety hierarchy, rejecting universal network intercept.
+17. docs/ADR/ADR-0005-persistent-queue-storage.md
+    - Amended to Hybrid Persistent Queue Storage (storage.local + IndexedDB).
+18. docs/ADR/ADR-0006-path-template-engine.md
+    - Amended to 8-step deterministic canonicalization and traversal defenses.
+19. README.md
+    - Updated project status to Phase 0.1 Hardened and aligned tech stack summary.
+
+================================================================================
+5. SECURITY FINDINGS
+================================================================================
+The Phase 0 architecture audit uncovered several critical security vulnerabilities
+and architectural risks in the initial design:
+1.  Excessive GitHub Scope: Phase 0 relied on OAuth App requesting monolithic `repo`
+    scope. This granted blanket read/write access to all public and private repos,
+    pull requests, and settings, violating least privilege.
+2.  Storage Quota Vulnerability: Storing full source code payloads in `browser.storage.local`
+    risked hitting the 10 MB quota during offline queuing, risking silent data loss.
+3.  Path Traversal Exposure: The initial path sanitization was insufficient against
+    encoded traversal (%2e%2e%2f), double encoding, Unicode homoglyphs, and DOS reserved
+    names (CON, PRN, AUX, NUL).
+4.  TOCTOU Write Races: Creating files without optimistic SHA checks risked silent
+    overwrites if concurrent tabs or user manual commits modified the target file.
+5.  Poison Pill Crash Loops: If a malformed submission crashed the ephemeral service
+    worker, restarting the worker could induce an infinite crash-restart loop.
+6.  Brittle Network Claims: Stating that network interception was the universal
+    mechanism overlooked platforms with public REST APIs (Codeforces) or internal
+    GraphQL polling (LeetCode), while raising unnecessary permission concerns.
+
+================================================================================
+6. ARCHITECTURAL FINDINGS
+================================================================================
+1.  Ephemeral Background Lifecycle: Chromium MV3 service workers terminate after ~30s
+    of idle time. All state transitions must follow a Write-Ahead Log (WAL) before
+    triggering network requests.
+2.  Browser Namespace Parity: WXT v0.21.x cleanly abstracts the `browser.*` vs `chrome.*`
+    namespace differences without custom wrapper overhead.
+3.  Storage Partitioning: A hybrid model separating metadata (`storage.local`) from
+    payloads (`IndexedDB`) preserves fast service worker boot time while scaling to
+    thousands of solutions.
+4.  Codolio Boundary: Codolio is a portfolio aggregator, not an online judge. Creating
+    an adapter for it would be an architectural error.
+
+================================================================================
+7. DECISIONS MADE
+================================================================================
+1.  GitHub App Architecture Adopted: User access tokens via Device Flow with repository-level
+    scoping and 8-hour expiration. PAT demoted to manual fallback.
+2.  Hybrid Storage Adopted: `browser.storage.local` for settings/metadata/locks + `IndexedDB`
+    for source code payloads and sync history.
+3.  Deterministic 8-Step Path Canonicalization Adopted: Multi-pass URL decode, NFKC
+    normalization, null-byte rejection, segment whitelisting, and base-folder boundary checks.
+4.  10-Step Safe Write Pipeline Adopted: Optimistic locking with remote SHA verification,
+    409 conflict handling with backoff, and content-hash deduplication.
+5.  Platform-Specific Extraction Hierarchy Adopted: Safest feasible layer per platform;
+    confidence threshold enforced at 0.70; fail-closed User-Assisted Recovery fallback.
+6.  Distributed TTL Mutex Adopted: 30-second TTL lock in `storage.local` with heartbeat to
+    serialize queue draining across concurrent tabs.
+7.  Poison-Pill Quarantine Adopted: Items causing 3 service worker crashes are isolated
+    into `REQUIRES_ATTENTION`.
+8.  Strict Content Security Policy Adopted: `script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';`.
+9.  Zero-Telemetry Policy Re-affirmed: Absolute ban on third-party telemetry, tracking,
+    or logging of credentials and source code.
+10. Fail-Closed Principle Enforced: All ambiguous states halt execution rather than
+    attempting best-effort writes.
+
+================================================================================
+8. ADRs CHANGED
+================================================================================
+- ADR-0003: Amended from "GitHub OAuth Device Flow" to "GitHub App with Device Authorization
+  Flow & Fine-Grained Permissions".
+- ADR-0004: Amended from "Layered Extraction Strategy" to "Layered Platform Extraction
+  Strategy & Safety Hierarchy" (clarifying per-platform viability).
+- ADR-0005: Amended from "Persistent Queue with browser.storage.local" to "Hybrid
+  Persistent Queue Storage (storage.local + IndexedDB)".
+- ADR-0006: Amended from "Path Template Engine Design" to "Hardened Path Template Engine
+  & Traversal Defense" (formalizing 8-step pipeline).
+
+================================================================================
+9. THREAT MODEL SUMMARY
+================================================================================
+Documented in docs/SECURITY.md §3. Evaluates 26 distinct threat scenarios:
+- A: Malicious coding-platform webpage (Zod schema validation, no credentials in DOM).
+- B: Malicious page content/script injection (Origin verification, strict IPC schemas).
+- C: Compromised platform API response (Zod parsing, 500 KB payload cap, safe defaults).
+- D: Malicious repo/path input (Regex whitelist, 8-step canonicalization pipeline).
+- E: Malicious metadata (Control char stripping, HTML entity decoding, integer checks).
+- F: Token theft (Storage in extension storage.local only, zero web/script exposure).
+- G: Token leakage in logs (Custom Logger with automated token/secret redaction).
+- H: Compromised extension context (Content script holds zero tokens and zero storage write access).
+- I: Malicious extension messages (Strict sender.id === runtime.id, external messages disabled).
+- J: Replayed messages (UUID v4 nonce and 30s timestamp window verification).
+- K: Duplicate submissions (SHA-256 line-normalized hash comparison; skip commit).
+- L: Concurrent queue processing (Distributed mutex lock with 30s TTL in storage.local).
+- M: GitHub SHA race conditions (Remote SHA optimistic check, 409 retry with backoff).
+- N: Repository confusion (Repository identity snapshotted at enqueue time).
+- O: Branch confusion (Explicit branch existence validation before write).
+- P: Path traversal (Rejection of .., leading slashes, absolute paths).
+- Q: Encoded traversal (Multi-pass decode, NFKC normalization, null-byte rejection).
+- R: XSS in UI (React 19 auto-escaping, zero dangerouslySetInnerHTML, strict CSP).
+- S: DOM injection (Toasts use Shadow DOM and textContent only).
+- T: Prototype pollution (Object.create(null), immutable configuration dictionaries).
+- U: Supply chain compromise (Minimal dependencies, package-lock pinning, npm audit in CI).
+- V: Malicious extension update (2FA on releases, store developer security, no remote code).
+- W: Browser-specific differences (Standardized WXT abstraction, ephemeral reconciliation).
+- X: Source code disclosure (Zero telemetry, HTTPS-only directly to api.github.com).
+- Y: Excessive permissions (GitHub App least privilege: Contents: write on select repos).
+- Z: Queue abuse / DoS (Max 200 items, 500 KB per item, rate limit backpressure).
+
+================================================================================
+10. GITHUB SECURITY DECISION
+================================================================================
+- Architecture: GitHub App using Device Authorization Flow for user-to-server tokens.
+- Permissions: Repository `Contents: write` only. Zero access to issues, PRs, or admin.
+- Repository Isolation: User selects "Only select repositories" during app authorization.
+- Token Lifetime: Access tokens expire in 8 hours; automatic rotation via 6-month refresh tokens.
+- Revocation: User disconnect wipes tokens and calls GitHub revocation endpoint.
+- PAT Policy: Supported strictly as an advanced/manual fallback with prominent warnings.
+- Write Safety: 10-step safe pipeline with optimistic locking, SHA conflict handling, and rate limit backpressure.
+
+================================================================================
+11. STORAGE DECISION
+================================================================================
+- Architecture: Hybrid Partitioned Storage.
+- `browser.storage.local` (<1 MB used): Stores user settings, auth tokens/metadata,
+  queue metadata (`QueueItemMetadata`), and distributed locks (`codesync:queue:lock`).
+- `IndexedDB` (`codesync_db`): Stores source code payloads (`QueueItemPayload`) and
+  full sync history (`SyncHistoryEntry`).
+- Rationale: Eliminates the risk of exceeding the 10 MB `storage.local` quota while
+  ensuring rapid service worker startup without deserializing large source code blobs.
+
+================================================================================
+12. QUEUE SECURITY DECISION
+================================================================================
+- Protocol: Two-phase Write-Ahead Log (WAL) — payload written to IndexedDB, metadata
+  written to storage.local before network operations begin.
+- Concurrency: Distributed mutex with 30-second TTL lock and heartbeat.
+- Crash Recovery: Startup reconciliation detects interrupted tasks, increments crash counter.
+- Poison-Pill Isolation: Submissions causing 3 service worker crashes are isolated to
+  `REQUIRES_ATTENTION`.
+- Retry Engine: Exponential backoff with ±20% jitter; maximum 5 attempts for transient errors.
+- Quota Management: Capped at 200 items; 500 KB max source code size per item.
+
+================================================================================
+13. EXTRACTION ARCHITECTURE DECISION
+================================================================================
+- Hierarchy: Ordered by safety and feasibility (Public API -> Same-Origin Authenticated
+  Endpoint -> Detail Page HTML -> Editor Bridge -> Scoped DOM -> User-Assisted Recovery).
+- Universal Interception Rejected: Platform adapters implement only viable methods:
+  - LeetCode: Same-origin GraphQL API + submission check polling + Monaco bridge.
+  - Codeforces: Public REST API (`user.status`) + submission page HTML parsing.
+  - CodeChef: Submission API observation + submission detail API.
+  - GeeksforGeeks: Submission payload interception + editor state bridge.
+- Confidence Threshold: Submissions with confidence < 0.70 fail closed and trigger
+  User-Assisted Recovery.
+- Codolio Status: Confirmed deferred. No adapter created (aggregator, not a judge).
+
+================================================================================
+14. COMPETITOR-ANALYSIS CORRECTIONS
+================================================================================
+- Corrected Sweeping Generalizations: Removed unsupported claims that CodeSync is
+  unique merely for supporting multiple platforms or device flow.
+- Recognized Prior Art: Acknowledged existing tools (LeetHub 2.0, LeetSync, Competitive
+  Companion, CP-Sync) and documented their real-world capabilities.
+- Evidence-Based Differentiation: Refocused differentiation on security-by-design
+  (GitHub App vs broad PAT), persistent queue reliability (WAL + crash recovery),
+  path traversal hardening (8-step canonicalization), safe write pipelines (TOCTOU defense),
+  and local-first zero-telemetry privacy.
+
+================================================================================
+15. REMAINING RISKS (DEFENSE-IN-DEPTH RESIDUAL RISKS)
+================================================================================
+1.  Platform DOM/API Drift: Coding platforms may change their internal APIs, GraphQL
+    schemas, or DOM layouts without notice. (Mitigation: Layered extraction fallbacks,
+    fail-closed behavior, User-Assisted Recovery, and automated CI canary tests).
+2.  Host Browser Sandbox Flaws: If the browser extension sandbox or underlying OS is
+    compromised by malware, local storage can be inspected. (Mitigation: OS-level profile
+    encryption, 8-hour token lifespans).
+3.  GitHub API Downtime: Extended GitHub outages or rate-limit exhaustion. (Mitigation:
+    Persistent 200-item queue survives restarts; pauses processing until rate limit reset).
+4.  Token Revocation Latency: If a user revokes access on GitHub.com, the extension
+    discovers this on the next write attempt. (Mitigation: Pre-flight token validation,
+    immediate transition to REQUIRES_ATTENTION, zero corrupted commits).
+
+================================================================================
+16. DEFERRED DECISIONS
+================================================================================
+1.  Submission History Backfill: Deferred to Phase 5. Architecture supports pagination
+    and IndexedDB storage, but core synchronization must stabilize first.
+2.  Codolio Integration: Deferred to Phase 5. If Codolio introduces a public portfolio
+    push API, CodeSync can push sync metadata; no submission judge exists today.
+3.  Third-Party Platform Plugin System: Deferred to post-v1. Core adapter registry
+    is architected to allow external modules in future iterations.
+4.  Apple Safari Web Extension Build: Deferred to Phase 4 / Tier 3. WXT supports it,
+    but initial release focuses on Chrome, Edge, and Firefox.
+
+================================================================================
+17. COMPLETE SECURITY-GATE CHECKLIST
+================================================================================
+[x] Threat model exists (Comprehensive 26-scenario threat model A-Z in SECURITY.md)
+[x] Trust boundaries are explicit (Zone 0 Untrusted, Zone 1 Trusted, Zone 2 GitHub)
+[x] GitHub authorization follows least privilege (GitHub App, Contents: write only)
+[x] PAT is not the preferred/default design (PAT marked strictly as manual fallback)
+[x] Token exposure paths are addressed (Zero token access in scripts, DOM, logs, URLs)
+[x] Extension permissions are justified (storage, alarms, notifications only)
+[x] Message validation is specified (Typed envelope, UUID v4 nonce, timestamp window)
+[x] Input validation is specified (MetadataValidator, length caps, character whitelists)
+[x] Path traversal is comprehensively addressed (8-step canonicalization pipeline)
+[x] Queue security is addressed (WAL, hybrid storage, TTL lock, poison pill isolation)
+[x] GitHub write safety is addressed (10-step safe write pipeline, TOCTOU / 409 retry)
+[x] XSS/injection risks are addressed (React 19 auto-escaping, no dangerouslySetInnerHTML)
+[x] CSP requirements are addressed (script-src 'self', object-src 'none', no remote code)
+[x] Platform extraction boundaries are precise (Layered hierarchy per platform)
+[x] Malicious platform data is considered (Hostile titles, slugs, ratings, script tags)
+[x] Logging cannot leak secrets/source (Automated redaction of tokens and source code)
+[x] Dependency security is addressed (Minimal deps, lockfile pinning, npm audit in CI)
+[x] Browser-specific security is addressed (Chromium vs Gecko lifecycle reconciliation)
+[x] Fail-closed behavior is defined (FAIL CLOSED > BEST-EFFORT WRITE invariant table)
+[x] Security testing requirements are documented (17 security test suites S1–S17)
+[x] Competitor claims are accurate (Evidence-based, factual differentiation)
+[x] All documentation is internally consistent (Cross-checked via grep searches)
+[x] No implementation code was created (Strictly documentation gate)
+
+================================================================================
+18. EXPLICIT STATEMENT CONFIRMING WHETHER IMPLEMENTATION FILES WERE CREATED
+================================================================================
+CONFIRMATION:
+ZERO (0) implementation source files, application code, package.json files,
+or dependency installations were created during Phase 0.1.
+The repository contains exclusively architecture documentation, decision records,
+specifications, and verification reports.
+Phase 1 implementation has NOT begun.
+
+================================================================================
+END OF PHASE 0.1 FINAL REPORT — STOPPING FOR REVIEW & APPROVAL
+================================================================================

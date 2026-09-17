@@ -1,0 +1,496 @@
+Ran command: `npm test`
+
+I have launched `npm test` to establish the exact pre-implementation baseline. I will wait for it to complete.
+
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+Ran command: `npm test`
+Viewed types.ts:1-175
+Viewed manager.ts:1-644
+Viewed backoff.ts:1-22
+Viewed drainer.ts:1-120
+Viewed background.ts:1-142
+Searched for "createGitHubQueueItemHandler"
+Viewed github-handler.ts:1-200
+Viewed github-handler.ts:201-450
+Viewed github-handler.ts:451-674
+Viewed client.ts:1-250
+Viewed client.ts:251-400
+Searched for "GitHubWriteOutcomeUnknownError"
+Viewed contents-service.ts:350-450
+Viewed concurrency.ts:1-250
+Viewed concurrency.ts:251-269
+Viewed local.ts:1-200
+Viewed local.ts:201-287
+Listed directory security
+Searched for "nextRetryAt"
+Viewed crash-boundary-recovery.test.ts:350-400
+Viewed crash-boundary-recovery.test.ts:300-350
+Viewed pipeline-e2e.test.ts:500-600
+Viewed pipeline-e2e.test.ts:980-1120
+Viewed queue-github-handler.test.ts:510-555
+Viewed queue-github-handler.test.ts:1260-1308
+Searched for "it("
+Viewed persistent-lease-fencing.test.ts:1-100
+Viewed persistent-lease-fencing.test.ts:300-450
+Viewed wal-recovery-integration.test.ts:1-100
+Ran command: `git status`
+
+# Phase 1C.4.3.2.2.3.0 Architecture & Integration Audit Report
+
+## 1. Executive Summary
+
+- **Objective**: Execute a comprehensive, audit-only inspection of the CodeSync repository to evaluate the durability, safety, and correctness of restart, retry, rate-limit, alarm, and fencing persistence across service-worker termination and fresh-worker reconstruction.
+- **Current Baseline**:
+  - `npm test`: **475 / 475 passing** (0 failures, 0 skipped, across 38 test files).
+  - `npm run compile` (`tsc --noEmit`): **PASS** (0 errors).
+  - `npm run lint` (`eslint .`): **PASS** (0 errors).
+  - `npm run format:check` (`prettier --check`): **PASS** (clean).
+  - `npm run build` (Chrome MV3): **PASS** (349.38 kB).
+  - `npm run build:firefox` (Firefox MV3): **PASS** (349.38 kB).
+- **Overall Architectural Assessment**:
+  The central architectural invariant — **`RETRY ELIGIBILITY IS DURABLE STATE, NOT WORKER-LOCAL STATE`** — is fundamentally sound and correctly enforced across the primary runtime layers.
+  1. Retry eligibility state (`attempts`, `nextRetryAt`, `lastError`, `state`) is held durably in `browser.storage.local` under `codesync:queue:metadata` rather than in service-worker memory.
+  2. The separation between retry attempts (`attempts`) and crash counts (`crashCount`) is strictly maintained: crashes increment `crashCount` in `reconcileInterruptedItems()`, while execution failures increment `attempts` in `drainQueue()`.
+  3. GitHub primary rate limits (`HTTP 429` and `HTTP 403` with `x-ratelimit-remaining === "0"`) and secondary abuse throttling (`HTTP 403` with `Retry-After`) are authoritatively distinguished from genuine authentication/authorization failures.
+  4. Known rate-limit rejections are cleanly separated from uncertain transport writes: `GitHubRateLimitError` bubbles immediately and never enters uncertain-write reconciliation.
+  5. All queue metadata mutations in `QueueManager.drainQueue()` and recovery methods validate the caller's monotonic fencing token immediately prior to persistence, preventing stale workers from overwriting newer retry state or scheduling obsolete retries.
+  6. Queue-drain alarms (`codesync_queue_drain_alarm`) and startup drains unconditionally respect `nextRetryAt` via the queue eligibility filter `(item.nextRetryAt ?? 0) <= now`, preventing premature retry attempts.
+- **Confirmed Production Defects**:
+  **No confirmed production defect identified during this audit.**
+- **Test Evidence Gaps**:
+  While the implementation is architecturally correct and key scenarios (e.g., `CRASH-INT-04`, `FENCE-INT-03`, `PUT-429-03`, `ALARM-06`) prove core behaviors, targeted integration tests are missing for:
+  - Multi-restart survival across 3+ successive worker generations without state drift (`RETRY-REC-03`, `RATE-REC-08`).
+  - Monotonic retry attempt increments across distinct worker reconstructions (`RETRY-REC-04`).
+  - Primary rate limit (403 remaining = 0) and secondary abuse throttle (403 + Retry-After) specifically tested across fresh-worker restarts (`RATE-REC-01`, `RATE-REC-02`).
+  - Effective delay dominance (`max(backoff, rateLimit)`) evaluated across worker reconstruction (`RATE-REC-03`).
+- **Recommendation**:
+  **`APPROVE WITH TEST GAPS`**
+
+---
+
+## 2. Current Architecture
+
+The actual retry and rate-limit lifecycle is organized into distinct execution layers:
+
+```
+[ GitHub API Endpoint ]
+        │
+        ▼ (HTTP 429 / 403 remaining=0 / 403 Retry-After)
+[ GitHubApiClient.request() ] (src/shared/github/client.ts)
+   - Extracts x-ratelimit-reset, x-ratelimit-remaining, retry-after
+   - Throws GitHubRateLimitError (isSecondary, resetTimestamp, retryAfterSeconds)
+        │
+        ▼
+[ GitHubContentsService.synchronizeFile() ] (src/shared/github/contents-service.ts)
+   - Explicit rate-limit check: "if (err instanceof GitHubRateLimitError) throw err;"
+   - Bypasses uncertain write reconciliation (known rejection; no commit)
+        │
+        ▼
+[ GitHubQueueSyncHandler.handle() ] (src/shared/queue/github-handler.ts)
+   - Catches GitHubRateLimitError
+   - Returns SyncResult { status: "failed", error: { retryable: true, resetTimestamp, retryAfterSeconds } }
+        │
+        ▼
+[ QueueManager.drainQueue() ] (src/shared/queue/manager.ts)
+   - Operates under two-tier lock (Web Lock + Persistent Lease with Fencing Token)
+   - Checks eligibility: isEligible = PENDING || (FAILED && nextRetryAt <= now)
+   - On "failed" SyncResult:
+       * Increments item.attempts += 1
+       * If attempts >= 5: transitions to REQUIRES_ATTENTION (quarantined)
+       * Else: computes backoffDelay = computeBackoffDelay(item.attempts)
+               computes rateLimitDelay from resetTimestamp or retryAfterSeconds
+               effectiveDelay = Math.max(backoffDelay, rateLimitDelay)
+               item.nextRetryAt = Date.now() + effectiveDelay
+               item.state = FAILED
+       * Validates fencing token: concurrency.validateFencingToken(workerId, fencingToken)
+       * Persists updated metadata to browser.storage.local (codesync:queue:metadata)
+        │
+        ▼
+[ Service Worker Terminates / Crashes ]
+   - Memory discarded; browser.storage.local remains authoritative and intact
+        │
+        ▼
+[ Fresh Worker Boots ] (src/entrypoints/background.ts)
+   - Triggered by "startup", "alarm" (codesync_queue_drain_alarm), or "submission_event"
+   - QueueDrainer.drain(triggerSource) invokes QueueManager.drainQueue()
+   - Reconciles WAL/orphans and interrupted PROCESSING items (reconcileInterruptedItems leaves FAILED intact)
+   - Reads durable queue: sees item.state === FAILED and now < item.nextRetryAt
+   - Safely skips processing with 0 network calls until now >= nextRetryAt
+```
+
+---
+
+## 3. Retry State Model
+
+The durable queue state machine is defined by [`QueueState`](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L11-L18) in `src/shared/storage/types.ts`:
+
+- **`PENDING`**: Initial durable state upon validated enqueue. Immediately eligible for processing during drain.
+- **`PROCESSING`**: Claimed exclusively by an authoritative worker under a validated lease fencing token. If interrupted by worker crash/suspension, `reconcileInterruptedItems()` increments `crashCount` (NOT `attempts`) and resets to `PENDING` (or quarantines to `REQUIRES_ATTENTION` if `crashCount >= 3`).
+- **`COMPLETED`**: Terminal success state (`commitSha` and `commitUrl` populated). Never eligible for retry. Archived to `SyncHistoryEntry` in IndexedDB.
+- **`SKIPPED`**: Terminal skip state (content identical to remote per duplicate policy). Never eligible for retry.
+- **`FAILED`**: Non-terminal retryable failure state. Has `attempts >= 1`, `nextRetryAt` populated, and `lastError` recorded.
+  - **Eligibility condition**: `item.state === QueueState.FAILED && (item.nextRetryAt ?? 0) <= now`.
+  - If `now < nextRetryAt`: Skipped cleanly during queue drain.
+  - If `now >= nextRetryAt`: Eligible for re-claim into `PROCESSING`.
+- **`REQUIRES_ATTENTION`**: Terminal quarantine state. Applied when:
+  - `attempts >= MAX_ATTEMPTS (5)` (exhausted retries).
+  - `crashCount >= POISON_PILL_CRASH_THRESHOLD (3)` (poison-pill isolation).
+  - Unrecoverable validation errors, auth failures (401/403 forbidden), path security violations, or missing payloads.
+  - Never eligible for automatic retry; requires manual user review or configuration update.
+
+### State Transition & Timing Lifecycle
+1. **Creation**: Enqueued via `QueueManager.enqueueSubmission()` in `PENDING` state with `attempts: 0`, `crashCount: 0`, and `nextRetryAt: undefined`.
+2. **Claim**: `drainQueue()` validates fencing token, transitions item to `PROCESSING`, records `fencingToken`, and persists metadata before invoking handler.
+3. **Execution Failure**: Handler returns `status: "failed"`.
+4. **Attempt Increment**: `item.attempts += 1` occurs inside `drainQueue()`.
+5. **Backoff / Rate Limit Calculation**: `effectiveDelay = Math.max(computeBackoffDelay(item.attempts), rateLimitDelay)` is computed.
+6. **Retry Scheduling**: `item.nextRetryAt = Date.now() + effectiveDelay`, `item.state = QueueState.FAILED`.
+7. **Fenced Persistence**: Fencing token re-validated and written to `browser.storage.local`.
+8. **Clearance**: On eventual successful retry, item transitions to `COMPLETED` and is purged after retention expiration via `purgeCompleted()`.
+
+---
+
+## 4. Retry Persistence Matrix
+
+| Field | Source | Durable Location | Written By | Read By | Restart Safe | Fenced | Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`attempts`** | Enqueue (0) / Failure (+1) | `browser.storage.local` (`codesync:queue:metadata`) | `QueueManager.enqueueSubmission`, `QueueManager.drainQueue` (L537, L578) | `QueueManager.drainQueue` (L538, L580), `computeBackoffDelay` | **Yes** | **Yes** (L461, L491, L577) | [`crash-boundary-recovery.test.ts:367`](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L367), [`pipeline-e2e.test.ts:548`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L548), [`persistent-lease-fencing.test.ts:385`](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts#L385) |
+| **`crashCount`** | Enqueue (0) / Crash Recovery (+1) | `browser.storage.local` (`codesync:queue:metadata`) | `QueueManager.enqueueSubmission`, `QueueManager.reconcileInterruptedItems` (L380), `reconcileWalAndOrphans` | `QueueManager.reconcileInterruptedItems` (L384) | **Yes** | **Yes** (L402) | [`crash-boundary-recovery.test.ts:302`](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L302), [`pipeline-e2e.test.ts:510`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L510) |
+| **`nextRetryAt`** | `drainQueue` failure calculation | `browser.storage.local` (`codesync:queue:metadata`) | `QueueManager.drainQueue` (L554) | `QueueManager.drainQueue` (L454) | **Yes** | **Yes** (L491) | [`crash-boundary-recovery.test.ts:368`](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L368), [`pipeline-e2e.test.ts:550`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L550), [`pipeline-e2e.test.ts:1002`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L1002) |
+| **`state`** | State transitions | `browser.storage.local` (`codesync:queue:metadata`) | `QueueManager.enqueueSubmission`, `drainQueue`, `reconcileInterruptedItems`, `reconcileWalAndOrphans` | `QueueManager.drainQueue` (L452), `enqueueSubmission`, `purgeCompleted` | **Yes** | **Yes** (L345, L402, L461, L473, L491, L577) | [`crash-boundary-recovery.test.ts:366`](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L366), [`persistent-lease-fencing.test.ts:366`](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts#L366) |
+| **`lastError`** | Error code & message | `browser.storage.local` (`codesync:queue:metadata`) | `QueueManager.drainQueue` (L558, L568, L583), `reconcileWalAndOrphans`, `reconcileInterruptedItems` | UI / tests / logging | **Yes** | **Yes** (L491, L577) | [`crash-boundary-recovery.test.ts:369`](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L369), [`pipeline-e2e.test.ts:549`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L549) |
+| **`fencingToken`** | Authoritative worker lease token | `browser.storage.local` (`codesync:queue:metadata`) | `QueueManager.drainQueue` (L465) | Diagnostics / inspection / tests | **Yes** | **Yes** (L461) | [`persistent-lease-fencing.test.ts:347`](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts#L347), [`persistent-lease-fencing.test.ts:367`](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts#L367) |
+| **`resetTimestamp`** | `x-ratelimit-reset` header | Memory -> encoded into `nextRetryAt` | `GitHubApiClient.extractRateLimit`, consumed in `drainQueue` | `QueueManager.drainQueue` (L545) | **Yes** (via `nextRetryAt`) | **Yes** | [`queue-drainer.test.ts:445`](file:///d:/Parth/Projects/CodeSync/tests/security/queue-drainer.test.ts#L445), [`queue-github-handler.test.ts:540`](file:///d:/Parth/Projects/CodeSync/tests/security/queue-github-handler.test.ts#L540) |
+| **`retryAfterSeconds`** | `retry-after` header | Memory -> encoded into `nextRetryAt` | `GitHubApiClient.extractRateLimit`, consumed in `drainQueue` | `QueueManager.drainQueue` (L550) | **Yes** (via `nextRetryAt`) | **Yes** | [`pipeline-e2e.test.ts:1088-1102`](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L1088-L1102) |
+| **`lease`** | Lease coordinator | `browser.storage.local` (`codesync:queue:lease`) | `QueueConcurrencyManager.acquirePersistentLease`, `renewHeartbeat`, `releaseLease` | `QueueConcurrencyManager` | **Yes** | **Yes** (monotonic token) | [`persistent-lease-fencing.test.ts:60-100`](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts#L60-L100) |
+
+---
+
+## 5. Backoff Analysis
+
+- **Location**: [`src/shared/queue/backoff.ts`](file:///d:/Parth/Projects/CodeSync/src/shared/queue/backoff.ts#L1-L22).
+- **Constants**:
+  - `BASE_DELAY_MS = 2000` (2 seconds).
+  - `MAX_DELAY_MS = 120_000` (2 minutes / 120 seconds).
+  - `BACKOFF_FACTOR = 2`.
+  - `JITTER_FRACTION = 0.2` (±20% uniform randomization).
+- **Formula**:
+  $$\text{safeAttempt} = \max(1, \lfloor \text{attempt} \rfloor)$$
+  $$\text{rawDelay} = \min(\text{BASE\_DELAY\_MS} \times \text{BACKOFF\_FACTOR}^{\text{safeAttempt} - 1}, \text{MAX\_DELAY\_MS})$$
+  $$\text{jitter} = \text{rawDelay} \times (\text{random}() \times 2 \times \text{JITTER\_FRACTION} - \text{JITTER\_FRACTION})$$
+  $$\text{delay} = \max(0, \text{round}(\text{rawDelay} + \text{jitter}))$$
+- **Attempt Input**:
+  In `QueueManager.drainQueue()`, `item.attempts += 1` occurs **before** `computeBackoffDelay(item.attempts)`.
+  - Attempt 1: $2000 \times 2^0 = 2000\,\text{ms} \pm 400\,\text{ms}$ (1.6s – 2.4s).
+  - Attempt 2: $2000 \times 2^1 = 4000\,\text{ms} \pm 800\,\text{ms}$ (3.2s – 4.8s).
+  - Attempt 3: $2000 \times 2^2 = 8000\,\text{ms} \pm 1600\,\text{ms}$ (6.4s – 9.6s).
+  - Attempt 4: $2000 \times 2^3 = 16000\,\text{ms} \pm 3200\,\text{ms}$ (12.8s – 19.2s).
+  - Attempt 5: Reaches `MAX_ATTEMPTS = 5` $\rightarrow$ quarantined to `REQUIRES_ATTENTION`.
+- **Clamping**: Clamped at upper bound by `MAX_DELAY_MS` (120,000 ms) and lower bound by `Math.max(0, ...)`.
+- **Restart Behavior**:
+  Backoff is computed **at failure time** and committed into durable `item.nextRetryAt`.
+  Worker restart does **not** reset backoff, does **not** recalculate backoff, and does **not** increment attempts. Fresh workers directly read the existing `nextRetryAt` from `browser.storage.local`.
+
+---
+
+## 6. Primary Rate-Limit Analysis
+
+- **HTTP Conditions**:
+  - `res.status === 429` (lines 254–265 in `client.ts`).
+  - `res.status === 403` with `rateLimit && rateLimit.remaining === 0` (lines 268–280 in `client.ts`).
+- **Inspection of Headers**:
+  - `x-ratelimit-remaining`: string parsed to integer.
+  - `x-ratelimit-reset`: epoch seconds. Converted to epoch milliseconds in `extractRateLimit()`:
+    ```ts
+    const resetTimestamp = resetStr ? parseInt(resetStr, 10) * 1000 : 0;
+    ```
+- **Error Construction**:
+  Throws `GitHubRateLimitError` with:
+  `resetTimestamp: rateLimit?.resetTimestamp ?? Date.now() + 60_000`, `retryAfterSeconds: rateLimit?.retryAfterSeconds`, `isSecondary: false`.
+- **Propagation through Stack**:
+  - In `GitHubContentsService`: lines 369–371 immediately re-throw `GitHubRateLimitError`.
+  - In `GitHubQueueSyncHandler`: lines 526–538 catch `GitHubRateLimitError` and return `SyncResult` with `status: "failed"`, `retryable: true`, and error properties populated.
+  - In `QueueManager.drainQueue`:
+    ```ts
+    if (result.error?.resetTimestamp) {
+      rateLimitDelay = Math.max(0, result.error.resetTimestamp - Date.now());
+    }
+    const effectiveDelay = Math.max(backoffDelay, rateLimitDelay);
+    item.nextRetryAt = Date.now() + effectiveDelay;
+    ```
+- **Durability**:
+  `item.nextRetryAt` is stored in `browser.storage.local` within `codesync:queue:metadata`. Across service-worker restarts, the fresh worker reads this timestamp and skips draining until the reset time has arrived.
+
+---
+
+## 7. Secondary Rate-Limit Analysis
+
+- **HTTP Conditions**:
+  - `res.status === 403` and `headers.get("retry-after")` is present (lines 284–299 in `client.ts`).
+  - `rateLimit.remaining > 0` (or not 0).
+- **Distinction from Authorization Failure**:
+  - If `res.status === 403` with `Retry-After`: Classified as abuse detection / secondary throttling. Throws `GitHubRateLimitError` with `isSecondary: true`.
+  - If `res.status === 403` without `Retry-After` and without `remaining === 0`: Classified as authentic authorization failure. Throws `GitHubApiError` with `code: ErrorCode.GITHUB_FORBIDDEN`, which `github-handler.ts` maps to `status: "requires_attention"` (`retryable: false`).
+  - Secondary throttling is thus strictly prevented from degrading into permanent authorization rejection.
+- **Parsing & Fallbacks**:
+  - `const retryAfterSec = parseInt(retryAfterHeader, 10);`
+  - Fallback: `const validRetryAfter = !isNaN(retryAfterSec) ? retryAfterSec : 60;` (fail-safe 60 seconds).
+  - `resetTimestamp: Date.now() + validRetryAfter * 1000`.
+- **Propagation**:
+  Mapped in `QueueManager` to `rateLimitDelay = result.error.retryAfterSeconds * 1000`, dominating shorter backoffs and persisting to `item.nextRetryAt`.
+
+---
+
+## 8. HTTP 429 Analysis
+
+- **Verification**:
+  In `src/shared/github/client.ts` (line 254), `HTTP 429` is matched directly:
+  ```ts
+  if (res.status === 429) {
+    throw new GitHubRateLimitError(
+      `GitHub API primary rate limit exhausted (HTTP 429). Resets at ${rateLimit?.resetTimestamp ?? 0}`,
+      { ... }
+    );
+  }
+  ```
+- **Non-Uncertain Outcome**:
+  In `src/shared/github/contents-service.ts` (lines 369–371), `GitHubRateLimitError` is explicitly intercepted and re-thrown **before** any transport-uncertainty handling:
+  ```ts
+  if (err instanceof GitHubRateLimitError) {
+    throw err;
+  }
+  ```
+- **Evidence**:
+  Conclusively proven in `pipeline-e2e.test.ts` (`PUT-429-03`), where a 429 on PUT produces request trace `["GET_REPOSITORY", "GET_BRANCH", "GET_FILE", "PUT_FILE_429"]` with **zero subsequent GET reconciliation calls**, followed by clean retry upon timer expiry.
+
+---
+
+## 9. Uncertain-Write Analysis
+
+- **Strict Separation**:
+  - **Transport-level PUT Failure** (`err.isRetryable || err.message.includes("timed out") || err.message.includes("Network failure")`):
+    The client cannot know if GitHub received and committed the blob. It invokes `this.reconcileUncertainWrite()`. If the remote content hash matches, it marks the write confirmed. If it does not match, it throws `GitHubWriteOutcomeUnknownError`.
+    In `github-handler.ts` (lines 540–550), `GitHubWriteOutcomeUnknownError` maps to `status: "requires_attention"` (`retryable: false`). Blind retry is forbidden.
+  - **Known HTTP 429 / 403 Rate Limit**:
+    The server responded definitively with a rejection code. The write outcome is 100% certain: it did **not** commit. It bypasses reconciliation and schedules an ordinary retry with delay.
+
+---
+
+## 10. Restart Analysis
+
+- **Worker Lifecycle Tracing**:
+  1. Worker A encounters retryable failure (rate limit or backoff).
+  2. Worker A calculates `nextRetryAt = Date.now() + effectiveDelay`.
+  3. Worker A validates its fencing token and persists `QueueItemMetadata` to `browser.storage.local`.
+  4. Worker A terminates (OS suspension, idle termination, crash).
+  5. Worker B initializes in a completely fresh execution context.
+  6. Worker B reads `codesync:queue:metadata` via `storage.getQueueMetadata()`.
+  7. Worker B executes WAL & orphan reconciliation (`reconcileWalAndOrphans`) and crashed item reconciliation (`reconcileInterruptedItems`).
+     - *Crucial*: `reconcileInterruptedItems` only scans for items in `QueueState.PROCESSING`.
+     - Items in `QueueState.FAILED` with `nextRetryAt` in the future are left completely untouched in `FAILED` state.
+  8. Worker B drains queue: `isEligible = PENDING || (FAILED && nextRetryAt <= now)`.
+  9. For an item where `now < nextRetryAt`, `isEligible` evaluates to `false`. Worker B skips the item without network calls or state mutation.
+- **Evidence**:
+  Proven in `CRASH-INT-04` (`tests/security/crash-boundary-recovery.test.ts:326-402`), where Worker B restarts, confirms durable `FAILED` state, `attempts: 1`, `nextRetryAt`, and skips early drain with zero PUT calls.
+
+---
+
+## 11. Alarm Analysis
+
+- **Registration**:
+  `QUEUE_DRAIN_ALARM_NAME = "codesync_queue_drain_alarm"` registered in `src/entrypoints/background.ts` via `setupQueueDrainAlarm()` with period `QUEUE_DRAIN_ALARM_PERIOD_MINUTES = 5`.
+- **Callback**:
+  `browser.alarms.onAlarm.addListener((alarm) => { if (alarm.name === QUEUE_DRAIN_ALARM_NAME) defaultQueueDrainer.drain("alarm"); })`.
+- **Cannot Bypass `nextRetryAt`**:
+  `QueueDrainer.drain("alarm")` delegates directly to `QueueManager.drainQueue("alarm", handler)`.
+  Line 451 of `QueueManager`:
+  ```ts
+  const isEligible =
+    item.state === QueueState.PENDING ||
+    (item.state === QueueState.FAILED && (item.nextRetryAt ?? 0) <= now);
+  if (!isEligible) {
+    continue;
+  }
+  ```
+  If the alarm fires at 10:25 when `nextRetryAt = 10:30`, `isEligible` is false and the item is skipped.
+- **Evidence**:
+  Proven in `ALARM-06` (`tests/security/queue-github-handler.test.ts:1267-1306`) and `E2E-07` (`tests/security/pipeline-e2e.test.ts:552-557`).
+
+---
+
+## 12. Lease / Fencing Analysis
+
+- **Two-Tier Concurrency Architecture**:
+  - **Tier 1**: Native Web Locks (`codesync_queue_drain`) for in-session mutual exclusion.
+  - **Tier 2**: Persistent Lease (`codesync:queue:lease`) in `browser.storage.local` with monotonic fencing tokens (`fencingToken`).
+- **Mutation Boundaries**:
+  Every durable mutation path in `QueueManager` enforces fencing validation:
+  1. WAL/Orphan metadata recovery: `validateFencingToken(workerId, fencingToken)` (line 345).
+  2. WAL entry deletion: `validateFencingToken(workerId, fencingToken)` (line 352).
+  3. Interrupted item crash reconciliation: `validateFencingToken(workerId, fencingToken)` (line 402).
+  4. Item transition to `PROCESSING`: `validateFencingToken(workerId, fencingToken)` (line 461).
+  5. Missing payload quarantine: `validateFencingToken(workerId, fencingToken)` (line 473).
+  6. Handler outcome commit (`completed`, `skipped`, `failed`, `requires_attention`): `validateFencingToken(workerId, fencingToken)` (line 491).
+  7. Catch-block exception handling: `validateFencingToken(workerId, fencingToken)` (line 577).
+- **Lease Expiration / Supersession Scenario**:
+  If Worker A (fence $N$) stalls during write and Worker B acquires the lease (fence $N+1$):
+  When Worker A resumes and calls `validateFencingToken(workerId, fencingToken)`, it reads `codesync:queue:lease` from `browser.storage.local`.
+  Because `existing.fencingToken ($N+1$) !== fencingToken ($N$)`, it throws `StaleLeaseError`.
+  Worker A's mutation is aborted before `storage.setQueueMetadata()` can execute.
+- **Evidence**:
+  Formally verified in `FENCE-INT-03` (`tests/security/persistent-lease-fencing.test.ts:300-396`), where stale Worker A is rejected with `StaleLeaseError` and prevented from overwriting Worker B's completed state, incrementing attempts, or scheduling a retry.
+
+---
+
+## 13. Retry Storm Analysis
+
+The architecture prevents retry storms via four coordinated defense layers:
+1. **Durable Eligibility Timestamp**: `nextRetryAt` is committed to `browser.storage.local`. Worker restart does not wipe this timestamp.
+2. **Mutual Exclusion**: Only one worker can hold the persistent lease (`codesync:queue:lease`) and Web Lock (`codesync_queue_drain`). Concurrent alarm or startup triggers gracefully return `null` immediately when contended.
+3. **Exponential Backoff with Jitter**: `computeBackoffDelay()` applies exponential doubling ($2s, 4s, 8s, 16s$) with $\pm 20\%$ uniform jitter, preventing synchronized request bursts across items.
+4. **Terminal Retry Ceiling**: Hard cutoff at `MAX_ATTEMPTS = 5` moves chronically failing items to `REQUIRES_ATTENTION`, terminating the retry loop.
+
+---
+
+## 14. Clock / Timestamp Analysis
+
+- **Consistency of Units**:
+  - `Date.now()` produces epoch milliseconds.
+  - `x-ratelimit-reset` is in epoch seconds; multiplied by $1000$ to epoch milliseconds in `client.ts` (`parseInt(resetStr, 10) * 1000`).
+  - `retry-after` is in seconds; multiplied by $1000$ to milliseconds in `manager.ts` (`retryAfterSeconds * 1000`).
+  - `backoffDelay` is in milliseconds.
+  - `item.nextRetryAt` is stored strictly in epoch milliseconds.
+  - Comparison in `drainQueue` compares `(item.nextRetryAt ?? 0) <= Date.now()` (ms to ms).
+- **Negative Delay & Overflow Protection**:
+  - `Math.max(0, result.error.resetTimestamp - Date.now())` guards against past/stale reset timestamps.
+  - `Math.max(0, ...)` guards jitter calculations against negative delay values.
+  - `isNaN()` checks in `client.ts` fall back to conservative defaults (e.g. 60s).
+
+---
+
+## 15. Fail-Closed Analysis
+
+- **Missing `nextRetryAt`**:
+  If an item is in `QueueState.FAILED` with `nextRetryAt: undefined`, `(item.nextRetryAt ?? 0) <= now` evaluates to `0 <= now` (true). The item is treated as eligible for its next attempt, but its accumulated `attempts` count is preserved. Upon another failure, `attempts` increments toward the terminal limit of 5.
+- **Corrupted Durable Metadata**:
+  `StorageService.getQueueMetadata()` validates each item in `codesync:queue:metadata`. If the array contains non-object or invalid elements, corrupted items are isolated to `codesync:corrupted` (`isolateCorrupted`), and only valid items are processed.
+- **Missing Payload**:
+  If an eligible metadata record references a missing IndexedDB payload, it transitions to `REQUIRES_ATTENTION` with `ErrorCode.PAYLOAD_NOT_FOUND` under fencing validation, preventing infinite processing loops.
+
+---
+
+## 16. Existing Test Coverage
+
+The repository has 38 test files and 475 passing tests. Relevant tests by category:
+
+- **Unit Tests**:
+  - `tests/security/queue-drainer.test.ts`: Tests `QueueDrainer` options, no-op when handler absent, alarm registration, and `nextRetryAt` preservation.
+  - `tests/security/queue-github-handler.test.ts`: Tests `GitHubQueueSyncHandler` validation, payload checks, path resolution, `GitHubRateLimitError` handling (`HANDLER-15`), and alarm cadence (`ALARM-06`).
+  - `tests/security/github-client.test.ts`: Tests `GitHubApiClient` header extraction, 429 parsing, secondary 403 throttling, and coordinated 401 refresh.
+- **Integration Tests**:
+  - `tests/security/pipeline-e2e.test.ts`: End-to-end testing of 429 rate limit delay dominance (`PUT-429-04`), retry after rate-limit expiry (`PUT-429-03`), and uncertain write reconciliation vs rate limit (`E2E-07`, `E2E-08`, `UNCERTAIN-PUT-REGRESSION-01`).
+  - `tests/security/concurrency-fencing.test.ts` & `tests/security/persistent-lease-fencing.test.ts`: Tests multi-generation lease takeover (`FENCE-INT-01`), stale worker rejection (`FENCE-INT-03`), and probe-and-verify (`FENCE-INT-04`).
+- **Fresh-Worker Tests**:
+  - `tests/security/crash-boundary-recovery.test.ts`: `CRASH-INT-04` creates Worker A, hits 429, terminates Worker A, constructs fresh Worker B from durable storage, proves early drain skips, advances time, proves Worker B retry succeeds.
+  - `tests/security/wal-recovery-integration.test.ts`: `WAL-REC-01` to `WAL-REC-04` verify fresh-worker reconstruction across WAL boundaries under superseded leases.
+- **Browser-Lifecycle Limitations**:
+  Existing tests run in Vitest (Node.js/JSDOM) using mock browser APIs (`browser.storage.local`, IndexedDB via `fake-indexeddb`). They do not simulate OS-level process killing, device sleep, or native browser quota eviction.
+
+---
+
+## 17. Candidate Test Matrix
+
+| ID | Scenario | Current Coverage | Classification | Priority | Reason |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **RETRY-REC-01** | Restart with future nextRetryAt | Partially covered by `CRASH-INT-04` (for 429 rate limit) | **ALREADY COVERED** | High | `CRASH-INT-04` proves Worker B starts, sees future `nextRetryAt`, and skips early drain with 0 network calls. |
+| **RETRY-REC-02** | Restart after nextRetryAt becomes eligible | Covered by `CRASH-INT-04` | **ALREADY COVERED** | High | `CRASH-INT-04` advances virtual time past deadline and proves fresh Worker B completes the retry cleanly. |
+| **RETRY-REC-03** | Multiple restarts preserve retry state | None across 3+ successive worker reconstructions | **TEST GAP** | High | No test traces 3 generations ($A \rightarrow B \rightarrow C$) verifying `nextRetryAt` and `attempts` remain strictly unmutated. |
+| **RETRY-REC-04** | Retry attempt persistence | Single retry tested; monotonic multi-failure across workers untested | **TEST GAP** | High | No test demonstrates Worker A failing attempt 1, Worker B failing attempt 2, up to terminal quarantine. |
+| **RATE-REC-01** | Primary rate-limit reset survives restart | Tested in memory (`HANDLER-15`), 429 tested in `CRASH-INT-04` | **TEST GAP** | High | Primary rate limit via `403 + remaining: 0` specifically across fresh-worker restart is unverified. |
+| **RATE-REC-02** | Secondary Retry-After survives restart | Tested in memory; 429 tested in `CRASH-INT-04` | **TEST GAP** | High | Secondary throttling (`403 + Retry-After`) across fresh-worker reconstruction is unverified. |
+| **RATE-REC-03** | Effective delay honors strongest applicable constraint | Tested in `PUT-429-04` within single harness | **TEST GAP** | Medium | Proving `max(backoff, rateLimit)` survives fresh worker reconstruction and governs Worker B's eligibility. |
+| **RATE-REC-04** | Rate-limit metadata survives worker reconstruction | Covered by `CRASH-INT-04` | **ALREADY COVERED** | Medium | `CRASH-INT-04` (L365–371) explicitly verifies `lastError.code === GITHUB_RATE_LIMITED` and `nextRetryAt`. |
+| **RATE-REC-05** | Known rate-limit response does not enter uncertain-write reconciliation | Covered by `PUT-429-03` | **ALREADY COVERED** | High | `PUT-429-03` asserts request trace contains `PUT_FILE_429` with zero reconciliation calls before retry. |
+| **RATE-REC-06** | Stale worker cannot mutate persisted retry state | Covered by `FENCE-INT-03` | **ALREADY COVERED** | High | `FENCE-INT-03` proves stale Worker A throws `StaleLeaseError` when trying to persist failure/retry state. |
+| **RATE-REC-07** | Queue-drain alarm cannot bypass nextRetryAt | Covered by `ALARM-06` and `CRASH-INT-04` | **ALREADY COVERED** | High | `ALARM-06` explicitly proves alarm drain skips when `nextRetryAt` is in the future. |
+| **RATE-REC-08** | Repeated restart cycles remain idempotent | Partially covered by WAL tests, not multi-cycle retry | **TEST GAP** | Medium | Verifying multiple restarts with unchanged clocks do not drift `nextRetryAt` or increment `crashCount`. |
+
+---
+
+## 18. Confirmed Production Defects
+
+**No confirmed production defect identified during this audit.**
+
+The implementation of `QueueManager`, `QueueDrainer`, `GitHubApiClient`, and `GitHubContentsService` conforms to the approved architecture and safety invariants.
+
+---
+
+## 19. Test Evidence Gaps
+
+The following specific test evidence gaps have been identified for closure in targeted test implementation phases:
+
+1. **Multi-Worker Attempt Chain (`RETRY-REC-04`)**:
+   Evidence is lacking that an item failing across successive independent workers ($Worker_A \rightarrow Worker_B \rightarrow Worker_C$) increments `attempts` monotonically ($1 \rightarrow 2 \rightarrow 3$) without resetting to 0, and cleanly transitions to `REQUIRES_ATTENTION` when `attempts >= 5`.
+2. **Successive Restart Idempotency Without Clock Advancement (`RETRY-REC-03` / `RATE-REC-08`)**:
+   Evidence is lacking that cycling through 3+ worker restarts ($A \rightarrow B \rightarrow C$) while `now < nextRetryAt` produces zero timestamp drift, zero state mutations, zero attempt increments, and zero crashCount increments.
+3. **Primary Rate Limit (403 Remaining = 0) Across Restart (`RATE-REC-01`)**:
+   Evidence is lacking that an HTTP 403 response with `x-ratelimit-remaining: "0"` and `x-ratelimit-reset` header persists its reset timestamp into `nextRetryAt` and is strictly honored by a reconstructed fresh worker.
+4. **Secondary Rate Limit (403 + Retry-After) Across Restart (`RATE-REC-02`)**:
+   Evidence is lacking that an HTTP 403 response with `Retry-After` header (abuse detection throttle) persists its delay into `nextRetryAt` and is strictly honored by a reconstructed fresh worker.
+5. **Effective Delay Dominance Across Worker Reconstruction (`RATE-REC-03`)**:
+   Evidence is lacking that when both exponential backoff and rate-limit delay apply, the calculated dominant delay survives worker reconstruction and governs eligibility in Worker B.
+
+---
+
+## 20. Security / Reliability Assessment
+
+- **Retry Persistence**: Retry state is completely decoupled from worker memory and persisted to `browser.storage.local`. Invariant verified.
+- **Rate-Limit Persistence**: Primary and secondary rate-limit delays are translated into absolute epoch timestamps and durably committed. Invariant verified.
+- **Fencing Protection**: Stale workers cannot overwrite retry state or schedule obsolete retries. Invariant verified.
+- **Restart Resilience**: Fresh workers boot, reconcile WAL and crashed items without disturbing `FAILED` items, and respect `nextRetryAt`. Invariant verified.
+- **Retry Storm Prevention**: Fencing, two-tier locks, exponential backoff with jitter, and max attempts protect against storms. Invariant verified.
+- **Uncertain Writes**: Known 429 / 403 rate limits never trigger uncertain-write reconciliation; transport PUT errors never trigger blind retries. Invariant verified.
+- **Idempotency**: Draining a queue where items are not eligible produces zero mutations and zero network requests. Invariant verified.
+
+---
+
+## 21. Validation Results
+
+| Check | Command | Result | Details |
+| :--- | :--- | :--- | :--- |
+| **Unit & Integration Tests** | `npm test` | **PASS** | 475 passed, 0 failed, 38 test files, 7.83s |
+| **TypeScript Compilation** | `npm run compile` | **PASS** | `tsc --noEmit` exited 0 |
+| **ESLint** | `npm run lint` | **PASS** | `eslint .` exited 0 |
+| **Prettier Format Check** | `npm run format:check` | **PASS** | All matched files use Prettier style |
+| **Chrome MV3 Build** | `npm run build` | **PASS** | Built in 1.64s, size 349.38 kB |
+| **Firefox MV3 Build** | `npm run build:firefox` | **PASS** | Built in 1.66s, size 349.38 kB |
+
+---
+
+## 22. Production Change Assessment
+
+- **Production changes = 0** (`src/` completely untouched)
+- **Test changes = 0** (`tests/` completely untouched)
+- **Configuration changes = 0**
+- **Dependency changes = 0**
+
+---
+
+## 23. Remaining Limitations
+
+1. **Automated Integration Evidence vs. Real Browser Lifecycle**:
+   Vitest integration tests with mocked storage and fake IndexedDB provide high confidence in algorithm and protocol correctness, but do not reproduce actual OS-level process termination, memory eviction under mobile/desktop constraints, or browser profile migration.
+2. **System Clock Slew**:
+   Calculations assume monotonic forward progression of `Date.now()`. System clock backward step while a worker is stopped could cause a future `nextRetryAt` to be considered eligible prematurely.
+
+---
+
+## 24. Recommendation
+
+### APPROVE WITH TEST GAPS
+
+No confirmed production defect identified during this audit. The current implementation adheres to the architectural design and safety invariants. Targeted integration tests should be implemented in Phase 1C.4.3.2.2.3.1 to close the remaining evidence gaps identified in Section 19.

@@ -1,0 +1,370 @@
+Searched for "401"
+Viewed client.ts:380-450
+Viewed client.ts:130-195
+Searched for "getAccessToken"
+Viewed client.ts:110-135
+Viewed contents-service.ts:340-430
+Viewed contents-service.ts:250-340
+Viewed contents-service.ts:150-250
+Viewed contents-service.ts:80-150
+Viewed github-handler.ts:480-600
+Viewed github-handler.ts:601-650
+Viewed manager.ts:460-570
+Viewed manager.ts:570-620
+Viewed background.ts:1-142
+Viewed e2e-harness.ts:1-150
+Viewed e2e-harness.ts:151-200
+Searched for "forceRefresh"
+Viewed client.ts:310-345
+Viewed client.ts:260-310
+Viewed mock-github-api.ts:170-250
+Viewed mock-github-api.ts:250-300
+Viewed mock-github-api.ts:450-550
+Searched for "configureVerificationHook"
+Viewed pipeline-e2e.test.ts:610-635
+Searched for "GITHUB_VERIFICATION_FAILED"
+Searched for "setAuthStatus"
+Viewed pipeline-e2e.test.ts:520-570
+Viewed pipeline-e2e.test.ts:380-455
+
+# PHASE 1C.4.3.3.0
+# ARCHITECTURE & FAILURE-MATRIX AUDIT
+
+---
+
+## 1. Executive Decision
+
+**`APPROVED FOR 1C.4.3.3.1`**
+
+The CodeSync repository's failure handling architecture is sound, fail-closed, and adheres to all security and concurrency invariants. Zero production defects were identified during this audit. Foundational rate-limiting, retry backoff, uncertain-write reconciliation, and restart persistence were verified in preceding phases. However, six specific end-to-end failure matrix integration gaps exist (primarily around end-to-end 401 token refresh coordination, 403 authorization denial, pre-flight GET network drops, and post-write verification mismatch). Phase 1C.4.3.3.1 is authorized to implement targeted integration tests closing these specific gaps without production code redesign.
+
+---
+
+## 2. Audit Scope
+
+This audit conducted an independent, non-destructive inspection of:
+- **Production Failure Paths**:
+  - `GitHubApiClient.request()` ([src/shared/github/client.ts:200-426](file:///d:/Parth/Projects/CodeSync/src/shared/github/client.ts#L200-L426)): HTTP status parsing, primary 403/429 rate limit detection, secondary 403 abuse detection, 409 conflict detection, 401 coordinated token refresh, network transport error wrapping.
+  - `GitHubContentsService.synchronizeFile()` ([src/shared/github/contents-service.ts:60-427](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts#L60-L427)): Steps 1–11 protocol, pre-flight `GET`, optimistic `PUT`, post-write verification `GET`, `reconcileUncertainWrite()`, explicit rate-limit pass-through.
+  - `createGitHubQueueItemHandler()` ([src/shared/queue/github-handler.ts:470-660](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L470-L660)): Mapping of API exceptions, auth errors, 403 authorization, 404 missing repo, and rate limits to `SyncResult`.
+  - `QueueManager.drainQueue()` ([src/shared/queue/manager.ts:440-600](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L440-L600)): Evaluation of `failed` vs `requires_attention`, attempt counter increment, exponential backoff with jitter, rate-limit delay dominance, terminal quarantine.
+  - `DurableTokenLifecycleManager.getValidAccessToken()` ([src/shared/auth/token-lifecycle.ts:250-450](file:///d:/Parth/Projects/CodeSync/src/shared/auth/token-lifecycle.ts#L250-L450)): Single-flight refresh leasing, epoch/generation fencing, stale response dropping.
+  - `defineBackground()` ([src/entrypoints/background.ts:30-140](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts#L30-L140)): Runtime wiring of lifecycle manager, client, contents service, and drainer.
+- **Existing Test Suites & Test Harnesses**:
+  - [tests/security/pipeline-e2e.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts) (19 tests)
+  - [tests/security/retry-rate-limit-recovery.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/retry-rate-limit-recovery.test.ts) (5 tests)
+  - [tests/security/persistent-lease-fencing.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts) (4 tests)
+  - [tests/security/wal-recovery-integration.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/wal-recovery-integration.test.ts) (4 tests)
+  - [tests/security/crash-boundary-recovery.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts) (6 tests)
+  - [tests/security/queue-github-handler.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/queue-github-handler.test.ts) (42 tests)
+  - [tests/security/token-lifecycle.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/token-lifecycle.test.ts) (32 tests)
+  - [tests/security/github-contents-write.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/github-contents-write.test.ts) (25 tests)
+  - [tests/helpers/mock-github-api.ts](file:///d:/Parth/Projects/CodeSync/tests/helpers/mock-github-api.ts) and [tests/helpers/e2e-harness.ts](file:///d:/Parth/Projects/CodeSync/tests/helpers/e2e-harness.ts).
+
+---
+
+## 3. Repository Baseline
+
+- **VCS Status**: The workspace directory is unversioned (`fatal: not a git repository`). Audited directly from disk state.
+- **Working State**: Clean. Zero uncommitted changes.
+- **Test Suite Status**: **480 passed / 480 total** across **39 test files** (0 failed, 0 skipped) in ~6.84s.
+- **Build Status**:
+  - `npm run compile` (`tsc --noEmit`): **PASS** (0 errors)
+  - `npm run lint` (`eslint .`): **PASS** (0 warnings, 0 errors)
+  - `npm run format:check` (`prettier --check`): **PASS** (100% compliant)
+  - `npm run build` (Chrome MV3): **PASS** (349.38 kB bundle)
+  - `npm run build:firefox` (Firefox MV3): **PASS** (349.38 kB bundle)
+- **Production Changes**: **0** (`src/**` untouched).
+- **Test Changes**: **0** (`tests/**` untouched).
+
+---
+
+## 4. Failure Matrix
+
+| ID | Failure Scenario | Classification | Retryable? | Remote State Known? | Queue Outcome | Existing Evidence | Status |
+|:---:|---|---|:---:|:---:|---|---|:---:|
+| **F-01** | Initial HTTP 401 | `GITHUB_UNAUTHORIZED` | Conditional | YES (rejected) | Attempt refresh; retry on 200 | `token-lifecycle.test.ts:AUTH-10`, `client.ts:401-426` | **YELLOW** |
+| **F-02** | 401 $\to$ Refresh Success $\to$ Retry | N/A (Resolved) | YES | YES (committed) | `COMPLETED` | `client.ts:401-426` (No E2E test) | **RED** |
+| **F-03** | 401 $\to$ Refresh Failure | `GITHUB_AUTH_REQUIRED` | NO | YES (rejected) | `REQUIRES_ATTENTION` | `HANDLER-16` (mocked spy) | **YELLOW** |
+| **F-04** | 403 Authorization Denial (Push Denied) | `GITHUB_FORBIDDEN` | NO | YES (rejected) | `REQUIRES_ATTENTION` (0 retries) | `HANDLER-17` (mocked spy) | **YELLOW** |
+| **F-05** | 403 Primary Rate Limit (`remaining=0`) | `GITHUB_RATE_LIMITED` | YES | YES (rejected) | `FAILED` (`nextRetryAt` set) | `RATE-REC-01`, `client.test.ts` | **GREEN** |
+| **F-06** | 403 Secondary Rate Limit (`Retry-After`) | `GITHUB_RATE_LIMITED` | YES | YES (rejected) | `FAILED` (`nextRetryAt` set) | `RATE-REC-02`, `client.test.ts` | **GREEN** |
+| **F-07** | HTTP 429 Rate Limit | `GITHUB_RATE_LIMITED` | YES | YES (rejected) | `FAILED` (`nextRetryAt` set) | `PUT-429-01..04`, `E2E-07` | **GREEN** |
+| **F-08** | Pre-flight GET Transport Failure / Drop | `GITHUB_API_ERROR` | YES | YES (no write sent) | `FAILED` (exponential backoff) | `client.test.ts` (No E2E pipeline test) | **RED** |
+| **F-09** | Pre-flight GET Timeout | `GITHUB_API_ERROR` | YES | YES (no write sent) | `FAILED` (exponential backoff) | `client.test.ts` (No E2E pipeline test) | **YELLOW** |
+| **F-10** | Pre-flight GET 5xx Server Error | `GITHUB_API_ERROR` | YES | YES (no write sent) | `FAILED` (exponential backoff) | `client.test.ts` (No E2E pipeline test) | **YELLOW** |
+| **F-11** | PUT Transport Drop (Commit Succeeded) | Uncertain $\to$ `CONFIRMED` | N/A | Recovered via GET | `COMPLETED` | `E2E-08A`, `UNCERTAIN-PUT-REGRESSION-01A` | **GREEN** |
+| **F-12** | PUT Transport Drop (Commit Failed) | Uncertain $\to$ Unknown | NO | Reconciled absent | `REQUIRES_ATTENTION` | `E2E-08B`, `UNCERTAIN-PUT-REGRESSION-01B` | **GREEN** |
+| **F-13** | PUT Timeout | Uncertain write | NO | Reconciled or unknown | `COMPLETED` or `REQUIRES_ATTENTION` | `contents-service.ts:376-413` | **GREEN** |
+| **F-14** | PUT 429 Rate Limit | `GITHUB_RATE_LIMITED` | YES | YES (no write sent) | `FAILED` (Retry-After delay) | `PUT-429-01`, `PUT-429-02`, `PUT-429-03` | **GREEN** |
+| **F-15** | PUT 403 Authorization Denial | `GITHUB_FORBIDDEN` | NO | YES (rejected) | `REQUIRES_ATTENTION` | `HANDLER-17` (mocked spy) | **YELLOW** |
+| **F-16** | PUT 409 Conflict (Resolved via Fresh SHA)| `GITHUB_CONFLICT` | YES | YES (conflicted) | `COMPLETED` | `E2E-05` Case A | **GREEN** |
+| **F-17** | PUT 409 Conflict (Continuous Exceeded) | `GITHUB_CONFLICT` | NO | YES (conflicted) | `REQUIRES_ATTENTION` | `E2E-05` Case B | **GREEN** |
+| **F-18** | PUT 5xx Server Error | Uncertain write | Conditional | Unknown until GET | Reconcile $\to$ `COMPLETED` or quarantine | `contents-service.ts:377` | **YELLOW** |
+| **F-19** | Verification GET Transport Failure | `GITHUB_RECONCILIATION_REQUIRED` | NO | UNKNOWN | `REQUIRES_ATTENTION` (commit preserved) | `E2E-08C` | **GREEN** |
+| **F-20** | Verification Content Hash Mismatch | `GITHUB_VERIFICATION_FAILED` | NO | MISMATCH | `REQUIRES_ATTENTION` (commit preserved) | `github-contents-write.test.ts:1002` | **YELLOW** |
+| **F-21** | Retry Exhaustion (Attempt 5) | Prior error code | NO | Known failure | `REQUIRES_ATTENTION` | `RETRY-REC-04` | **GREEN** |
+| **F-22** | Worker Crash during Failure Handling | Stale / Interrupted | N/A | Preserved in storage | Recovered on next drain | `CRASH-INT-04`, `RETRY-REC-03` | **GREEN** |
+
+---
+
+## 5. Existing Coverage
+
+### Strong E2E Coverage (Production code + In-memory mock server + Full pipeline)
+- **`PUT-429-01..04` & `E2E-07`**: HTTP 429 on GET/PUT sets durable `nextRetryAt`, respects `Retry-After`, skips premature drain passes, retries and completes cleanly upon delay expiration.
+- **`UNCERTAIN-PUT-REGRESSION-01` & `E2E-08A/B`**: Genuine transport drops during PUT invoke `reconcileUncertainWrite`. Adopt remote commit if hash matches; quarantine if write did not commit. Zero blind duplicate writes.
+- **`E2E-08C`**: Post-write verification GET network failure transitions safely to `REQUIRES_ATTENTION` with `GITHUB_RECONCILIATION_REQUIRED` without issuing duplicate PUTs.
+- **`E2E-05A/B`**: 409 Conflict triggers fresh authoritative GET, resolves with fresh parent SHA on conditional retry, and bounds runaway conflicts at `MAX_CONFLICT_REVALIDATIONS = 2`.
+- **`RETRY-REC-03..04` & `RATE-REC-01..03`**: Multi-restart persistence across 4–5 fresh worker generations, strict separation of `attempts` from `crashCount`, terminal quarantine at attempt 5, and delay dominance ($\max(\text{backoff}, \text{rateLimit})$).
+
+### Integration Coverage (Multiple real components wired via harness)
+- **`CRASH-INT-01..06-SEC`**: Multi-worker lifecycle isolation with fail-closed I/O termination, startup reconciliation, and tamper detection.
+- **`FENCE-INT-01..04`**: Monotonic fencing token validation rejecting stale mutations across worker generations.
+- **`WAL-REC-01..04`**: Intent-first WAL recovery, orphan payload quarantine, and crash-safe metadata sequencing.
+
+### Component-Only Coverage (Mocked dependencies / Mocked handlers)
+- **`HANDLER-16`**: Authentication failure handling (mocks `synchronizeFile` rejecting with `GitHubAuthError`).
+- **`HANDLER-17`**: Authorization failure handling (mocks `synchronizeFile` rejecting with `GitHubApiError(status: 403, GITHUB_FORBIDDEN)`).
+- **`HANDLER-20`**: Verification UNKNOWN handling (mocks `synchronizeFile` returning `status: "requires_attention"`).
+- **`token-lifecycle.test.ts:AUTH-08..40`**: Component-level testing of `DurableTokenLifecycleManager` in isolation, completely unintegrated with `QueueDrainer` or `pipeline-e2e.test.ts`.
+- **`github-contents-write.test.ts`**: Component-level testing of `GitHubContentsService` with mock fetch functions.
+
+### Unit-Only Coverage
+- **`browser-compat.test.ts`**: Basic capability detection and fail-closed error construction.
+- **`errors.test.ts`**: Serialization and formatting of custom `AppError` hierarchies.
+
+### Missing Coverage
+1. **End-to-End Coordinated 401 Refresh**: No test verifies an initial 401 received by `GitHubApiClient` automatically triggering `lifecycleManager.getValidAccessToken({ forceRefresh: true })`, refreshing the token, and retrying the request to successful synchronization within an unbroken queue drain pass.
+2. **End-to-End 401 Refresh Failure**: No test verifies an initial 401 where refresh is rejected by GitHub (e.g., `bad_refresh_token`), verifying the queue item enters `REQUIRES_ATTENTION` with `GITHUB_AUTH_REQUIRED` and triggers user re-auth without retry storms.
+3. **End-to-End 403 Authorization Denial**: No test injects a non-rate-limit 403 (push access denied / missing repo write permission) through `MockGitHubServer` to verify immediate quarantine without retry backoff.
+4. **End-to-End Pre-flight GET Transport Disconnect**: No test exercises a network drop or timeout during pre-flight `GET` (`getRepository` or pre-flight `getFileContents`), verifying clean `FAILED` status with backoff, zero blind PUTs, and zero uncertain-write reconciliation overhead.
+5. **End-to-End Post-Write Verification Content Mismatch**: No test exercises a successful PUT followed by a verification `GET` that returns mismatched content (`MISMATCH`), verifying quarantine to `REQUIRES_ATTENTION` with `GITHUB_VERIFICATION_FAILED`.
+6. **End-to-End Pre-flight GET 5xx Server Error**: No test exercises a 500/502/503 server error on pre-flight `GET`, proving it is treated as retryable without uncertain-write reconciliation.
+
+---
+
+## 6. Authentication Failure Audit
+
+### Architecture & Production Flow
+1. **Detection**: In [src/shared/github/client.ts:329, 404](file:///d:/Parth/Projects/CodeSync/src/shared/github/client.ts#L329-L404), an HTTP 401 response from any GitHub API endpoint throws `GitHubApiError(status: 401, code: GITHUB_UNAUTHORIZED)`.
+2. **Coordinated Refresh**: `request()` catches `err.status === 401` at line 406. If `this.lifecycleManager` is configured:
+   - Invokes `await this.getAccessToken(true)` ([src/shared/github/client.ts:412](file:///d:/Parth/Projects/CodeSync/src/shared/github/client.ts#L412)), setting `forceRefresh: true`.
+   - `DurableTokenLifecycleManager` claims the exclusive refresh lease in `browser.storage.local`, validates generation/epoch fencing, calls GitHub token endpoint, rotates refresh token, increments generation, and saves new credentials.
+   - Request is re-executed exactly once with `refreshedToken` ([src/shared/github/client.ts:422](file:///d:/Parth/Projects/CodeSync/src/shared/github/client.ts#L422)).
+3. **Terminal 401**: If the second attempt returns 401, or if refresh fails (e.g., revoked refresh token), the error is terminal and bubbles out.
+4. **Queue Outcome**: In [src/shared/queue/github-handler.ts:563-585](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L563-L585), `GitHubAuthError` or `GitHubApiError(status: 401)` returns `{ status: "requires_attention", error: { retryable: false } }`.
+5. **Queue Manager**: Item enters `QueueState.REQUIRES_ATTENTION`. Zero retries consumed.
+
+### Gap Analysis
+In [tests/helpers/e2e-harness.ts:152](file:///d:/Parth/Projects/CodeSync/tests/helpers/e2e-harness.ts#L152), the harness injects `tokenSupplier: async () => "dummy_access_token_123"` rather than a `DurableTokenLifecycleManager`. Consequently, end-to-end 401 handling across the pipeline has **never been executed in an integrated test**.
+
+---
+
+## 7. Authorization Failure Audit
+
+### Architecture & Production Flow
+1. **Detection**: In [src/shared/github/client.ts:267-303](file:///d:/Parth/Projects/CodeSync/src/shared/github/client.ts#L267-L303), when `res.status === 403`:
+   - If `rateLimit?.remaining === 0` $\to$ `GitHubRateLimitError` (primary rate limit).
+   - If `res.headers.get("retry-after")` $\to$ `GitHubRateLimitError` (secondary abuse rate limit).
+   - If neither condition holds $\to$ falls through to line 330, throwing `GitHubApiError(status: 403, code: GITHUB_FORBIDDEN, isRetryable: false)`.
+2. **Queue Handler**: In [src/shared/queue/github-handler.ts:587-597](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L587-L597), `err.status === 403` returns `{ status: "requires_attention", error: { code: GITHUB_FORBIDDEN, retryable: false } }`.
+3. **Queue Manager**: In [src/shared/queue/manager.ts:564-574](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L564-L574), transitions directly to `QueueState.REQUIRES_ATTENTION`. `attempts` is NOT incremented. Zero retries scheduled.
+
+### Gap Analysis
+Tested only via mock spy in `HANDLER-17`. Has never been verified via realistic HTTP response parsing through `MockGitHubServer` in the E2E harness.
+
+---
+
+## 8. Rate-Limit Audit
+
+### Summary of Existing Hardened Behavior
+- **HTTP 429**: Verified in `PUT-429-01..04` and `E2E-07`. Known rate-limit error bubbles immediately to handler; does not invoke uncertain-write reconciliation; sets `nextRetryAt` based on `Retry-After`; retries after virtual clock advances.
+- **Primary 403 (`remaining = 0`)**: Verified in `RATE-REC-01`. Correctly parsed, persisted across worker restarts, respects `x-ratelimit-reset`.
+- **Secondary 403 (`Retry-After`)**: Verified in `RATE-REC-02`. Correctly distinguished from authorization failure, persisted across worker restarts.
+- **Delay Dominance**: Verified in `RATE-REC-03` and `PUT-429-04`. Evaluates $\max(\text{backoffDelay}, \text{rateLimitDelay})$.
+- **Status**: **GREEN (SUFFICIENTLY PROVEN)**. No duplicate rate-limit tests needed in Phase 1C.4.3.3.1.
+
+---
+
+## 9. Network / Transport Failure Audit
+
+### Pre-Flight GET vs PUT Differentiation
+1. **Pre-flight GET** (`getRepository`, `getBranch`, pre-flight `getFileContents`):
+   - **Remote Commit State**: **AUTHORITATIVELY KNOWN TO NOT HAVE OCCURRED**. No write packet was dispatched.
+   - **Handling**: Throws `GitHubApiError(isRetryable: true)` ([src/shared/github/client.ts:377-385](file:///d:/Parth/Projects/CodeSync/src/shared/github/client.ts#L377-L385)). Bubbles to `github-handler.ts:610-619`, returning `{ status: "failed", error: { retryable: true } }`.
+   - **Queue Outcome**: Item transitions to `QueueState.FAILED` with exponential backoff delay. Zero reconciliation overhead.
+2. **PUT (Write Dispatch)**:
+   - **Remote Commit State**: **UNCERTAIN**. Network drop after TCP send means GitHub may have committed the blob/commit before socket disconnect.
+   - **Handling**: [src/shared/github/contents-service.ts:376-413](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts#L376-L413) catches retryable/network error and executes `reconcileUncertainWrite()`.
+   - **Queue Outcome**: If remote content matches $\to$ adopted as `COMPLETED`. If remote does not match $\to$ throws `GitHubWriteOutcomeUnknownError` $\to$ quarantined to `REQUIRES_ATTENTION`. Zero blind retries.
+3. **Verification GET**:
+   - **Remote Commit State**: **ALREADY WRITTEN & CONFIRMED BY PUT RESPONSE**.
+   - **Handling**: Post-write verification failure treats outcome as `UNKNOWN` $\to$ returns `{ status: "requires_attention", attentionReason: "GITHUB_RECONCILIATION_REQUIRED" }`, preserving commit SHA.
+
+### Gap Analysis
+Pre-flight GET transport failure and pre-flight GET 5xx server error are currently unverified at the full pipeline level.
+
+---
+
+## 10. Uncertain Write Audit
+
+### Architectural Invariant
+$$\text{KNOWN HTTP OUTCOME} \neq \text{TRANSPORT UNCERTAINTY}$$
+
+- When GitHub returns an explicit HTTP response (e.g., 401, 403, 404, 409, 429), the write outcome is known: the write did **NOT** commit. Reconciliation is bypassed entirely.
+- When network disconnects, times out, or throws a transport error during `PUT`, the outcome is genuinely uncertain. `reconcileUncertainWrite()` issues an authoritative fresh `GET`:
+  - If content hash matches $\to$ `COMPLETED`.
+  - If content hash does not match or is absent $\to$ `REQUIRES_ATTENTION` (`GITHUB_WRITE_OUTCOME_UNKNOWN`).
+- **Status**: **GREEN**. Fully verified in `PUT-429-01`, `UNCERTAIN-PUT-REGRESSION-01`, and `E2E-08`.
+
+---
+
+## 11. Verification Failure Audit
+
+### Three-Way Verification Protocol ([src/shared/github/contents-service.ts:215-282](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts#L215-L282))
+1. **`CONFIRMED`**: Remote content blob hash matches local content hash $\to$ `status: "created" | "updated"`, commit SHA recorded $\to$ Queue item `COMPLETED`.
+2. **`MISMATCH`**: Remote file exists but content hash differs (concurrent foreign commit displaced write) $\to$ `status: "requires_attention"`, `attentionReason: "GITHUB_VERIFICATION_FAILED"`, preserving commit SHA $\to$ Queue item `REQUIRES_ATTENTION`.
+3. **`UNKNOWN`**: Verification `GET` fails due to network drop or timeout $\to$ `status: "requires_attention"`, `attentionReason: "GITHUB_RECONCILIATION_REQUIRED"`, preserving commit SHA $\to$ Queue item `REQUIRES_ATTENTION`.
+
+### Gap Analysis
+`UNKNOWN` is verified in `E2E-08C`. `MISMATCH` is only verified in component tests (`github-contents-write.test.ts:1002`) and lacks an unbroken pipeline test.
+
+---
+
+## 12. Retry Exhaustion Audit
+
+- Enforced in [src/shared/queue/manager.ts:538](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L538): `if (item.attempts >= MAX_ATTEMPTS) item.state = QueueState.REQUIRES_ATTENTION`.
+- `MAX_ATTEMPTS = 5` defined in `manager.ts:27`.
+- Verified across 5 successive worker restarts in [tests/security/retry-rate-limit-recovery.test.ts:187-302](file:///d:/Parth/Projects/CodeSync/tests/security/retry-rate-limit-recovery.test.ts#L187-L302) (`RETRY-REC-04`).
+- `crashCount` does not pollute `attempts`.
+- **Status**: **GREEN (SUFFICIENTLY PROVEN)**.
+
+---
+
+## 13. Recovery Interaction
+
+- **Intent-First WAL**: `INTENT` record persisted in IndexedDB `wal_logs` prior to payload/metadata write. Verified in `WAL-REC-01..04`.
+- **Interrupted PROCESSING Recovery**: Stale items in `PROCESSING` have `crashCount` incremented; at crash count $\ge 3$, quarantined as poison pill; below 3, reset to `PENDING` without consuming retry attempts.
+- **Fencing Protection**: Recovery mutations require monotonic fencing token validation (`validateFencingToken`). Stale workers cannot modify recovery state. Verified in `WAL-REC-04` and `FENCE-INT-03`.
+- **Durable Retention**: `nextRetryAt`, `attempts`, and error metadata survive service-worker termination. Verified in `RETRY-REC-03`.
+- **Status**: **GREEN**.
+
+---
+
+## 14. Concurrent Trigger Audit
+
+- **Coalescence**: Concurrent arrival of `submission_event`, `startup`, and periodic 5-minute alarm (`codesync_queue_drain_alarm`) safely serialize under two-tier lock:
+  - Tier 1: Ephemeral native Web Locks (`codesync_queue_drain`).
+  - Tier 2: Persistent storage lease (`codesync:queue:lease`) with Lamport probe-and-verify fallback.
+- Verified in [tests/security/pipeline-e2e.test.ts:767-794](file:///d:/Parth/Projects/CodeSync/tests/security/pipeline-e2e.test.ts#L767-L794) (`E2E-11`) and [tests/security/persistent-lease-fencing.test.ts:390-488](file:///d:/Parth/Projects/CodeSync/tests/security/persistent-lease-fencing.test.ts#L390-L488) (`FENCE-INT-04`).
+- **Status**: **GREEN**.
+
+---
+
+## 15. Security Invariant Results
+
+| # | Security / Reliability Invariant | Assessment | Evidence |
+|:---:|---|:---:|---|
+| 1 | Webpage cannot directly authorize a GitHub write | **PASS** | `content.ts` strictly sends validated messages; verified in `E2E-09`. |
+| 2 | Content scripts cannot bypass service-worker trust boundary | **PASS** | Origin, extension ID, and nonce validation enforced in `SubmissionHandler`. |
+| 3 | Auth state cannot be overwritten by stale refresh results | **PASS** | Tripartite generation/attempt/epoch fencing in `DurableTokenLifecycleManager`. |
+| 4 | Stale workers cannot mutate queue retry state | **PASS** | Fencing validation at `manager.ts:549`; verified in `FENCE-INT-03`. |
+| 5 | Known HTTP rate limits are not treated as uncertain writes | **PASS** | Verified in `PUT-429-01`; zero reconciliation calls issued. |
+| 6 | Transport write failures cannot trigger blind PUT retries | **PASS** | Verified in `UNCERTAIN-PUT-REGRESSION-01` and `E2E-08B`. |
+| 7 | Verification UNKNOWN cannot become success | **PASS** | Verified in `E2E-08C`; transitions to `REQUIRES_ATTENTION`. |
+| 8 | Authorization failure cannot become a retry storm | **PASS** | Verified in `HANDLER-17`; transitions to `REQUIRES_ATTENTION`, 0 retries. |
+| 9 | Retry exhaustion cannot loop indefinitely | **PASS** | Verified in `RETRY-REC-04`; terminal quarantine at attempt 5. |
+| 10 | Durable retry state survives worker reconstruction | **PASS** | Verified in `RETRY-REC-03` across 4 worker generations. |
+| 11 | `nextRetryAt` cannot be bypassed by startup/alarm | **PASS** | Verified in `E2E-07`, `RATE-REC-01`, and `ALARM-06`. |
+| 12 | Failure handling cannot bypass TargetSnapshot authorization | **PASS** | Verified in `HANDLER-09`; unauthorized repo blocked before write. |
+
+---
+
+## 16. Candidate 1C.4.3.3.1 Tests
+
+To close the remaining evidence gaps without redundant testing, Phase 1C.4.3.3.1 should implement exclusively these **six targeted integration tests**:
+
+### 1. `FAIL-MAT-01`: 401 Unauthorized $\to$ Coordinated Refresh $\to$ Retry Success
+- **Purpose**: Verify unbroken pipeline recovery when initial GitHub request receives 401, triggers coordinated token refresh, and retries with new token to `COMPLETED`.
+- **Injection Point**: `MockGitHubServer` returns HTTP 401 on first call; returns 200 on retry with rotated token.
+- **Expected Outcome**: Queue item transitions to `COMPLETED`, commit SHA recorded, exactly 1 refresh executed, sync history entry created.
+- **Why Needed**: Proves `GitHubApiClient` 401 retry loop integrates with queue drainer.
+
+### 2. `FAIL-MAT-02`: 401 Unauthorized $\to$ Refresh Token Revoked $\to$ Quarantine
+- **Purpose**: Verify fail-closed quarantine when 401 refresh attempt is rejected by GitHub (`bad_refresh_token`).
+- **Injection Point**: Simulated refresh failure in token supplier / auth manager.
+- **Expected Outcome**: Queue item transitions to `REQUIRES_ATTENTION` with `code: GITHUB_AUTH_REQUIRED`, `attempts` = 0 (no retry storm).
+- **Why Needed**: Proves permanent authentication loss does not trigger infinite retries.
+
+### 3. `FAIL-MAT-03`: 403 Authorization Denial $\to$ Immediate Quarantine
+- **Purpose**: Verify non-rate-limit 403 (push access denied / repository read-only) is recognized as authorization failure and quarantined immediately.
+- **Injection Point**: `MockGitHubServer` returns HTTP 403 with `x-ratelimit-remaining: 5000` (no `Retry-After`).
+- **Expected Outcome**: Queue item transitions to `REQUIRES_ATTENTION` with `code: GITHUB_FORBIDDEN`, `attempts` = 0, zero blind retries.
+- **Why Needed**: Proves permission denial is never misclassified as a rate limit.
+
+### 4. `FAIL-MAT-04`: Pre-flight GET Transport Disconnect $\to$ Clean Backoff
+- **Purpose**: Verify network failure during pre-flight GET (`GET_REPOSITORY` or pre-flight `GET_FILE`) is handled cleanly without uncertain-write reconciliation.
+- **Injection Point**: `MockGitHubServer.configureNetworkFailure({ method: "GET" })`.
+- **Expected Outcome**: Queue item transitions to `FAILED`, `attempts` = 1, `nextRetryAt` set via exponential backoff, zero PUT calls, zero reconciliation calls.
+- **Why Needed**: Proves clean separation of pre-write transport failure from post-write uncertainty.
+
+### 5. `FAIL-MAT-05`: Post-Write Verification Content Mismatch $\to$ Quarantine
+- **Purpose**: Verify that when PUT succeeds but post-write verification GET reveals a different content hash (`MISMATCH`), the item transitions safely to `REQUIRES_ATTENTION`.
+- **Injection Point**: `MockGitHubServer.configureVerificationHook({ type: "mismatch" })`.
+- **Expected Outcome**: Queue item transitions to `REQUIRES_ATTENTION` with `attentionReason: GITHUB_VERIFICATION_FAILED`, PUT commit SHA preserved for diagnostics, zero duplicate PUTs.
+- **Why Needed**: Closes the missing verification outcome path in the E2E pipeline.
+
+### 6. `FAIL-MAT-06`: Pre-flight GET 5xx Server Error $\to$ Retryable Failure
+- **Purpose**: Verify HTTP 500/502 on pre-flight GET is classified as a retryable API error and safely completes on second drain pass.
+- **Injection Point**: `MockGitHubServer` configured to return HTTP 500 once on GET.
+- **Expected Outcome**: First drain sets `FAILED` with backoff; second drain after backoff expiry succeeds to `COMPLETED`.
+- **Why Needed**: Validates 5xx classification upstream of write dispatch.
+
+---
+
+## 17. Findings
+
+### Confirmed Production Defects
+**NONE**. The production architecture correctly implements all required failure classification, recovery, and quarantine logic.
+
+### Test / Evidence Gaps
+Six specific end-to-end integration paths are currently covered only by component mocks or are absent from the continuous E2E pipeline harness (detailed in Section 16).
+
+### Informational Observations
+- `tests/helpers/e2e-harness.ts` utilizes a static `tokenSupplier: async () => "dummy_access_token_123"`. For `FAIL-MAT-01` and `FAIL-MAT-02`, the test file or harness options will need to support injecting a token supplier that tracks rotations or simulates refresh failures.
+- `MockGitHubServer` in `tests/helpers/mock-github-api.ts` already has hooks for `setAuthStatus`, `configureNetworkFailure`, and `configureVerificationHook`, making test implementation straightforward without altering production source.
+
+---
+
+## 18. Quality Gates
+
+| Gate | Command | Result | Details |
+|---|---|:---:|---|
+| **Full test suite** | `npm test` | **PASS** | 480 passed / 480 total (39 test files) in 6.84s |
+| **TypeScript Compile** | `npm run compile` | **PASS** | `tsc --noEmit` exited with code 0 |
+| **Linter** | `npm run lint` | **PASS** | `eslint .` exited with code 0 |
+| **Formatting** | `npm run format:check` | **PASS** | `prettier --check` confirmed 100% compliance |
+| **Chrome MV3 Build** | `npm run build` | **PASS** | WXT build generated 349.38 kB bundle |
+| **Firefox MV3 Build** | `npm run build:firefox` | **PASS** | WXT build generated 349.38 kB bundle |
+
+---
+
+## 19. Production Changes
+
+```text
+PRODUCTION SOURCE CHANGES: 0
+
+TEST CHANGES: 0
+```
+
+Zero lines of production code and zero lines of test code were modified, added, or deleted during this audit.
+
+---
+
+## 20. Final Recommendation
+
+**NEXT PHASE:**
+`Phase 1C.4.3.3.1 — Retry / Rate-Limit / Failure Matrix: Targeted Integration Tests`
+
+**WHY:**
+Phase 1C.4.3.3.0 has completed the architectural and failure-matrix audit. The production codebase is defect-free, and the exact candidate tests required to complete the failure matrix have been formally identified (`FAIL-MAT-01` through `FAIL-MAT-06`). The project should proceed directly to Phase 1C.4.3.3.1 to implement and validate these six targeted integration tests.

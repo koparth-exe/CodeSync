@@ -1,0 +1,35 @@
+{
+  "testId": "RB-SECURITY-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:40.515Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "hostilePageApiAccess": {
+      "hasChromeRuntime": false,
+      "hasInternalId": false,
+      "hasOnMessage": false,
+      "hasStorage": false
+    },
+    "swPrototypeClean": true,
+    "inlineScriptBlocked": true,
+    "externalScriptBlocked": true
+  },
+  "relevantStorageState": {
+    "storageRestrictedToExtension": true
+  },
+  "consoleErrors": [
+    "Executing inline script violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-Gg5eGBmwbye15StJCroacVdiK3j/3liucUX6x9lm9k0='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*'. Either the 'unsafe-inline' keyword, a hash ('sha256-Gg5eGBmwbye15StJCroacVdiK3j/3liucUX6x9lm9k0='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+    "Loading the script 'https://example-evil.com/malicious.js' violates the following Content Security Policy directive: \"script-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.",
+    "Loading the script 'https://example-evil.com/malicious.js' violates the following Content Security Policy directive: \"script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+  ],
+  "invariantsExercised": [
+    "HOSTILE_PAGE_PRIVILEGE_ISOLATION",
+    "PROTOTYPE_POLLUTION_CONTAINMENT",
+    "EXTENSION_CSP_EVAL_FORBIDDEN",
+    "EXTENSION_CSP_INLINE_SCRIPT_REJECTED"
+  ]
+}

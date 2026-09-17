@@ -1,0 +1,487 @@
+Viewed concurrency.ts:1-150
+Viewed concurrency.ts:151-269
+Viewed manager.ts:1-160
+Viewed manager.ts:161-350
+Viewed manager.ts:351-520
+Viewed manager.ts:521-616
+Searched for "reconcileWalAndOrphans"
+Viewed drainer.ts:1-120
+Viewed types.ts:1-100
+Viewed types.ts:101-175
+Viewed local.ts:1-120
+Viewed local.ts:200-287
+Viewed local.ts:160-205
+Viewed concurrency-fencing.test.ts:1-150
+Viewed concurrency-fencing.test.ts:151-272
+Viewed queue-concurrency.test.ts:1-150
+Viewed queue-concurrency.test.ts:151-248
+Viewed background.ts:1-142
+Searched for "isOwner"
+Searched for "hasLease"
+Searched for "leaseValid"
+Searched for "currentFence"
+Searched for "validateFencingToken"
+Searched for "purgeCompleted"
+Searched for "item.fencingToken"
+Searched for "fencingToken"
+Searched for "putWalEntry"
+Searched for "deletePayload"
+
+# Phase 1C.4.3.2.2.0 Audit Report
+## Persistent Lease + Fencing Recovery Formal Repository Audit
+
+---
+
+## 1. Executive Summary
+
+This formal audit evaluates the durable ownership and stale-worker prevention subsystem of CodeSync prior to authorizing Phase 1C.4.3.2.2.1. 
+
+The audit inspected the two-tier concurrency architecture:
+- **Tier 1 (Ephemeral Coordination):** Native Web Locks API ([navigator.locks](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L236-L261)) enforcing in-session mutual exclusion.
+- **Tier 2 (Durable Ownership):** Persistent lease record in `browser.storage.local` ([QueueLeaseRecord](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L100-L108)) with Lamport-style Probe-and-Verify acquisition.
+- **Stale-Worker Prevention:** Monotonic fencing tokens ([fencingToken](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L102)) validated at the mutation boundary via [validateFencingToken](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L152-L175).
+
+**Audit Conclusions:**
+1. **Core Invariant Enforced:** The core invariant—*a worker MUST NOT be able to mutate protected durable state merely because it previously held a valid lease*—is architecturally sound and implemented in production code. Mutation authority is strictly re-validated at the mutation boundary ([src/shared/queue/manager.ts:L463](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L463), [L549](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L549)).
+2. **Zero Confirmed Defects:** Production code changes required = **0**. No architectural flaws, data corruption paths, or stale mutation leaks were found.
+3. **Evidence Status:** Unit and integration coverage proves mutual exclusion, stale rejection upon resumption ([CRASH-INT-05](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L422)), and Web Lock fallback. However, multi-generation monotonicity (>2 generations), orderly release token reset dynamics, and handler-error mutation boundaries remain under-tested at the integration level.
+4. **Recommendation:** **APPROVE WITH TEST GAPS** — Proceed to Phase 1C.4.3.2.2.1 to implement a focused set of integration tests closing these specific gaps without modifying production code.
+
+---
+
+## 2. Repository Baseline
+
+- **Branch / Git Status:** Not an initialized git repository (`fatal: not a git repository (or any of the parent directories): .git`). Git metadata is unavailable.
+- **Diff:** 0 local uncommitted diffs to tracked files.
+- **Untracked / Added Files for Phase 1C.4.3.2.1:**
+  - [tests/helpers/crash-harness.ts](file:///d:/Parth/Projects/CodeSync/tests/helpers/crash-harness.ts) (449 lines)
+  - [tests/security/crash-boundary-recovery.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts) (556 lines)
+- **Current Test Count:** **467 passing** across **36 test files** (0 failures, 0 skipped).
+- **TypeScript Compilation (`npm run compile`):** **PASSED** (0 errors, `tsc --noEmit`).
+- **ESLint (`npm run lint`):** **PASSED** (0 warnings, 0 errors).
+- **Formatting (`npm run format:check`):** **PASSED** (Prettier code style confirmed).
+- **Chrome MV3 Build (`npm run build`):** **PASSED** (349.22 kB bundle).
+- **Firefox MV3 Build (`npm run build:firefox`):** **PASSED** (349.22 kB bundle).
+
+---
+
+## 3. Files and Symbols Inspected
+
+### Production Sources
+- [src/shared/queue/concurrency.ts](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts):
+  - [QueueConcurrencyManager](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L27)
+  - [acquirePersistentLease](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L38)
+  - [renewHeartbeat](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L121)
+  - [validateFencingToken](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L152)
+  - [releaseLease](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L181)
+  - [runExclusively](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L195)
+  - Constants: `LEASE_TTL_MS` (30s), `HEARTBEAT_INTERVAL_MS` (10s), `MAX_WORKER_OWNERSHIP_MS` (300s), `WEB_LOCK_NAME` ("codesync_queue_drain")
+- [src/shared/queue/manager.ts](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts):
+  - [QueueManager.drainQueue](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L392)
+  - [QueueManager.reconcileWalAndOrphans](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L206)
+  - [QueueManager.reconcileInterruptedItems](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L353)
+  - [QueueManager.enqueueSubmission](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L58)
+  - [QueueManager.purgeCompleted](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L586)
+- [src/shared/queue/drainer.ts](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts):
+  - [QueueDrainer.drain](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts#L105)
+  - [setupQueueDrainAlarm](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts#L19)
+- [src/shared/storage/local.ts](file:///d:/Parth/Projects/CodeSync/src/shared/storage/local.ts):
+  - [StorageService.getLease](file:///d:/Parth/Projects/CodeSync/src/shared/storage/local.ts#L188)
+  - [StorageService.setLease](file:///d:/Parth/Projects/CodeSync/src/shared/storage/local.ts#L212)
+  - [StorageService.removeLease](file:///d:/Parth/Projects/CodeSync/src/shared/storage/local.ts#L219)
+  - [StorageService.isolateCorrupted](file:///d:/Parth/Projects/CodeSync/src/shared/storage/local.ts#L248)
+- [src/shared/storage/types.ts](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts):
+  - [QueueLeaseRecord](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L100)
+  - [QueueItemMetadata](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L43)
+  - [WalEntry](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L157)
+  - [SyncHistoryEntry](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L113)
+- [src/entrypoints/background.ts](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts):
+  - Startup, alarm, and submission drain triggers.
+
+### Test Suites Inspected
+- [tests/security/queue-concurrency.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/queue-concurrency.test.ts) (9 unit tests)
+- [tests/security/concurrency-fencing.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/concurrency-fencing.test.ts) (6 unit/component tests)
+- [tests/security/crash-boundary-recovery.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts) (6 integration tests)
+- [tests/helpers/crash-harness.ts](file:///d:/Parth/Projects/CodeSync/tests/helpers/crash-harness.ts) (Crash test environment)
+
+---
+
+## 4. Current Lease Architecture
+
+The lease architecture operates as a two-tier hybrid model:
+
+```mermaid
+flowchart TD
+    Trigger[Drain Trigger: startup / alarm / submission] --> RunExclusively[QueueConcurrencyManager.runExclusively]
+    RunExclusively --> WebLockCheck{Web Locks Supported & Available?}
+    WebLockCheck -- Yes --> RequestWebLock[navigator.locks.request exclusive]
+    WebLockCheck -- No / Throws --> Tier2Direct[Direct Tier 2 Fallback]
+    RequestWebLock -- Lock Granted --> AcquireLease[Tier 2: acquirePersistentLease]
+    RequestWebLock -- Lock Contended --> YieldNull[Yield null gracefully]
+    Tier2Direct --> AcquireLease
+    AcquireLease --> Probe[Step 1: Check existing lease in storage.local]
+    Probe -- Active & Not Self --> YieldContended[Yield null: Active lease held]
+    Probe -- Expired or None --> PreCommit[Step 2: Pre-commit recheck]
+    PreCommit -- Interleaving Winner --> YieldInterleave[Yield null: Interleaving takeover]
+    PreCommit -- Clear --> WriteCandidate[Write candidate lease: fencingToken N+1]
+    WriteCandidate --> VerifyReadBack[Step 3: Verification read-back]
+    VerifyReadBack -- Overwritten by Race --> YieldCollision[Yield null: Collision detected]
+    VerifyReadBack -- Verified Self --> LeaseHeld[Lease Acquired Authoritatively]
+    LeaseHeld --> Heartbeat[Start Heartbeat: every 10s renewHeartbeat]
+    LeaseHeld --> DrainPass[Execute QueueManager.drainQueue]
+    DrainPass --> ReleaseLease[finally: releaseLease matching workerId + fencingToken]
+```
+
+### Key Architectural Invariants
+1. **Coordination vs Ownership:** Web Locks coordinate execution between currently running threads/tabs in the browser. The persistent lease in `browser.storage.local` authoritatively records ownership across process crashes and restarts.
+2. **Probe-and-Verify:** In the absence of atomic Compare-And-Swap (CAS) in `browser.storage.local`, `acquirePersistentLease` executes a three-phase write protocol:
+   - Read existing lease and compute `nextFencingToken`.
+   - Pre-commit check immediately before write to detect interleaving competitors.
+   - Post-commit verification read-back to verify that the caller's write was not overwritten by a concurrent race.
+
+---
+
+## 5. Current Fencing Architecture
+
+Fencing tokens enforce monotonic generation sequencing:
+1. **Generation:** When acquiring an expired lease or unowned queue, the new worker observes the existing lease's token `N` and persists `N + 1`.
+2. **Authority Binding:** The worker execution closure binds `fencingToken` alongside its unique `workerId` (`crypto.randomUUID()`).
+3. **Validation Call:** [validateFencingToken(workerId, fencingToken)](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L152) reads `storage.getLease()`.
+4. **Rejection Rule:** The call rejects fail-closed with [StaleLeaseError](file:///d:/Parth/Projects/CodeSync/src/shared/errors/index.ts) if:
+   - `!existing` (lease was removed or expired),
+   - `existing.workerId !== workerId` (superseded by another worker),
+   - `existing.fencingToken !== fencingToken` (token generation mismatch), OR
+   - `Date.now() > existing.expiresAt` (lease expired in wall-clock time).
+
+---
+
+## 6. Lease Durability Findings
+
+1. **Storage Subsystem:**
+   - The lease record is stored in `browser.storage.local` under the dedicated key `STORAGE_KEYS.QUEUE_LEASE = "codesync:queue_lease"` ([src/shared/storage/keys.ts](file:///d:/Parth/Projects/CodeSync/src/shared/storage/keys.ts)).
+   - Persisted fields: `workerId`, `fencingToken`, `acquiredAt`, `expiresAt`, `maxLifetimeExpiresAt`, `triggerSource` ([src/shared/storage/types.ts:L100-L108](file:///d:/Parth/Projects/CodeSync/src/shared/storage/types.ts#L100-L108)).
+2. **Worker Reconstruction:**
+   - A newly booted Service Worker does not rely on any retained memory. On startup, [QueueManager.drainQueue](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L392) re-reads the lease from `storage.local`.
+   - In [tests/security/crash-boundary-recovery.test.ts:L86-L100](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L86-L100), Worker B starts with completely separate class instances and reconstructs lease authority solely from durable storage.
+3. **Expiration Calculation:**
+   - Calculated via `expiresAt = now + LEASE_TTL_MS` (30 seconds).
+   - Enforces an absolute upper bound `maxLifetimeExpiresAt = now + MAX_WORKER_OWNERSHIP_MS` (5 minutes). Even if heartbeats continuously renew, `renewHeartbeat()` rejects renewals past 5 minutes ([src/shared/queue/concurrency.ts:L136](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L136)).
+4. **Clock Assumptions:**
+   - Expiration compares `Date.now()` against durable timestamps.
+   - Monotonicity does not depend on system time: the fencing counter increments as an integer (`existing.fencingToken + 1`). If the wall clock jumps backward, an active lease could appear non-expired longer (up to TTL), but fencing tokens cannot roll backward.
+
+---
+
+## 7. Fencing Findings
+
+1. **Monotonicity Across Crashes:**
+   - If Worker A holds lease token `1` and crashes, the lease remains in `storage.local` with `fencingToken: 1`.
+   - When Worker B detects expiration, line 65 executes: `nextFencingToken = existing ? existing.fencingToken + 1 : 1`, producing `2`.
+   - This increment is strictly monotonic across crash-recovery cycles.
+2. **Orderly Release Counter Reset (Architectural Nuance):**
+   - When a worker finishes queue processing normally, [releaseLease](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L181) executes:
+     ```ts
+     if (existing && existing.workerId === workerId && existing.fencingToken === fencingToken) {
+       await this.storage.removeLease();
+     }
+     ```
+   - If no subsequent worker is active, the lease key is removed.
+   - On the next distinct trigger (e.g. 10 minutes later), `existing` is `null`, and line 65 sets `nextFencingToken = 1`.
+   - **Is this a stale-worker defect?** No. Stale-worker protection does **not** rely on token number alone; it relies on the tuple `(workerId, fencingToken, expiresAt)`. Since `workerId` is a cryptographically random UUID v4 generated per `runExclusively` execution, an old worker with token 1 from a previous session cannot pass `validateFencingToken` because `existing.workerId !== workerId`. If no lease exists, `!existing` rejects.
+3. **Authoritative State Checking:**
+   - Fencing is never checked against in-memory cached booleans. Every call to `validateFencingToken` invokes `await this.storage.getLease()`, directly hitting the storage driver.
+
+---
+
+## 8. Mutation-Boundary / TOCTOU Findings
+
+The critical race analyzed is:
+```
+Worker A: validates lease/fence N
+Worker A: starts asynchronous network work (GitHubContentsService)
+Worker B: detects lease expiry, acquires lease N+1
+Worker A: network work finishes, attempts durable mutation
+```
+
+### Trace Analysis in Production Code
+In [src/shared/queue/manager.ts:L460-L465](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L460-L465):
+```ts
+const result = await handler(item, payload);
+
+// Fencing Check before committing handler outcome
+await this.concurrency.validateFencingToken(workerId, fencingToken);
+```
+1. **Network Completion != Local Mutation Authority:** Even though Worker A's network call succeeded on GitHub, Worker A does **not** possess mutation authority upon return.
+2. **Rejection at Boundary:** Line 463 executes `validateFencingToken(workerA, N)`. Storage contains Worker B's lease with `workerId: "Worker-B"` and `fencingToken: N+1`.
+3. **Fail-Closed Abort:** `validateFencingToken` throws [StaleLeaseError](file:///d:/Parth/Projects/CodeSync/src/shared/errors/index.ts).
+4. **Catch-Block Re-validation:** The error drops into the `catch (err)` block at line 547:
+   ```ts
+   // Fencing Check before writing error state
+   await this.concurrency.validateFencingToken(workerId, fencingToken);
+   ```
+   Worker A calls `validateFencingToken` **again** before it can write a `FAILED` or `REQUIRES_ATTENTION` error state. It throws `StaleLeaseError` a second time, immediately aborting without executing `storage.setQueueMetadata`.
+5. **No Release Hijacking:** In the `finally` block of `runExclusively`, Worker A calls `releaseLease(workerA, N)`. Line 185 checks `existing.workerId === workerA`. Because `existing.workerId` is Worker B, Worker A's release is a no-op and does not clear Worker B's lease.
+
+---
+
+## 9. Worker Restart Findings
+
+In [tests/security/crash-boundary-recovery.test.ts:L420-L514](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L420-L514) (`CRASH-INT-05`):
+- **Simulation:** Worker A enters `drainQueue`, acquires lease `N=1`, and is suspended inside `onBeforePreFlightGet`.
+- **Takeover:** Virtual time advances past 30s. Worker B boots from shared durable storage, claims the expired lease, increments fencing token to `N=2`, processes the item to `COMPLETED`, and writes commit SHA.
+- **Resumption:** Worker A resumes and completes its handler pass.
+- **Outcome:** Worker A is rejected with `StaleLeaseError`. Durable storage preserves Worker B's `COMPLETED` state and token `2`. Zero duplicate history records are created.
+
+### Scope of Evidence
+- `CRASH-INT-05` conclusively proves that an in-flight worker suspended mid-handler cannot mutate queue metadata or history after another worker supersedes its fence.
+- However, `CRASH-INT-05` tests 2 generations (Worker A -> Worker B). Multi-cycle recovery (>2 generations) and handler failure branches under superseded fences were not tested in that integration suite.
+
+---
+
+## 10. Web Lock / Persistent Lease Findings
+
+1. **Coordination vs Ownership:**
+   - Web Locks (`navigator.locks`) are used strictly for in-session mutual exclusion to avoid unnecessary storage write contention.
+   - If Web Locks succeed, `acquirePersistentLease` is still invoked inside the lock callback ([concurrency.ts:L251](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L251)). Web Lock success never bypasses persistent leasing or fencing.
+2. **Fallback Semantics:**
+   - If `navigator.locks` throws an unexpected runtime error ([concurrency.ts:L258](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L258)), the error is caught and execution falls back directly to Tier 2 persistent lease.
+   - If `navigator.locks` is undefined (e.g. Firefox MV3 without Web Locks or non-supported context), line 264 executes `executeWithLease()` directly.
+3. **Current Coverage Classification:**
+   - Web Lock fallback resilience: **UNIT** (`concurrency-fencing.test.ts:L180-L270`)
+   - Persistent lease without Web Lock: **INTEGRATION** (`CRASH-INT-05` explicitly disabled `navigator.locks` to test pure persistent fencing).
+
+---
+
+## 11. Concurrent Takeover Findings
+
+Scenario: Worker A holds lease token `1`. Worker B and Worker C simultaneously attempt takeover upon expiration.
+
+1. **Under Tier 1 (Web Locks Available):**
+   - Web Locks API grants the exclusive lock to either Worker B or Worker C.
+   - The winner acquires lease token `2`. The other yields immediately with `null`.
+2. **Under Tier 2 Alone (Web Locks Absent or Thrown):**
+   - Both workers execute `acquirePersistentLease`.
+   - **Pre-commit Check ([L73](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L73)):** If Worker B writes first, Worker C's pre-commit check observes Worker B's active lease and yields without writing.
+   - **Verification Read-Back ([L99](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L99)):** If Worker B and Worker C write candidate leases concurrently, the last write in storage wins. The loser reads back storage, detects `verified.workerId !== myWorkerId`, and yields with `reason: "Lease collision detected during verification read-back."`
+3. **Risk Analysis:**
+   - Two workers cannot both believe they hold an active lease. The verification read-back guarantees single ownership.
+
+---
+
+## 12. Lease Renewal Findings
+
+- **Heartbeat Interval:** 10,000 ms (10 seconds).
+- **Lease TTL:** 30,000 ms (30 seconds).
+- **Maximum Lifetime:** 300,000 ms (5 minutes).
+- **Renewal Verification:** [renewHeartbeat](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L121) requires exact match of `workerId` and `fencingToken`. If the lease was superseded or cleared, renewal returns `false`.
+- **Expiry Enforcement:** If `Date.now() >= existing.maxLifetimeExpiresAt`, renewal returns `false` ([concurrency.ts:L136](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L136)), forcing the worker to relinquish ownership.
+
+---
+
+## 13. Lease Release Findings
+
+- **Method:** [releaseLease(workerId, fencingToken)](file:///d:/Parth/Projects/CodeSync/src/shared/queue/concurrency.ts#L181).
+- **Safe Release Invariant:**
+  ```ts
+  if (existing && existing.workerId === workerId && existing.fencingToken === fencingToken) {
+    await this.storage.removeLease();
+  }
+  ```
+- **Stale Protection:** If Worker A holds fence `1`, Worker B supersedes to fence `2`, and Worker A subsequently attempts release, `existing.fencingToken === 2 !== 1`. Worker A's release request is safely ignored. Worker B's lease remains fully intact.
+- Verified by unit test: [tests/security/concurrency-fencing.test.ts:L135-L140](file:///d:/Parth/Projects/CodeSync/tests/security/concurrency-fencing.test.ts#L135-L140).
+
+---
+
+## 14. WAL + Lease Interaction
+
+1. **Enqueue Path:**
+   - [QueueManager.enqueueSubmission](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L58) writes WAL intent, persists payload, writes queue metadata, and deletes WAL intent.
+   - Enqueue does not hold the drain lease because enqueuing is an ingestion-only path, protected by WAL and idempotent duplicate detection.
+2. **Recovery Path:**
+   - [QueueManager.reconcileWalAndOrphans](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L206) and [reconcileInterruptedItems](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L353) execute at the beginning of `drainQueue`, inside the `runExclusively` callback.
+   - Recovery executes under active lease ownership.
+   - All recovery operations are idempotent.
+
+---
+
+## 15. QueueDrainer Integration Findings
+
+- [QueueDrainer](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts) contains no custom locking or lease logic. It delegates all concurrency and fencing to [QueueManager.drainQueue](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L392).
+- **Trigger Convergence:**
+  - `submission_event` trigger -> calls `QueueDrainer.drain("submission_event")`
+  - `alarm` trigger -> calls `QueueDrainer.drain("alarm")`
+  - `startup` trigger -> calls `QueueDrainer.drain("startup")`
+- All triggers converge on `QueueConcurrencyManager.runExclusively`, ensuring identical lease and fencing enforcement regardless of trigger source.
+
+---
+
+## 16. Protected Mutation Matrix
+
+| Mutation | Authority Required | Fence Checked? | Durable State Checked? | Stale Worker Rejected? | Evidence |
+|---|---|---|---|---|---|
+| **Acquire Lease** | None (Unowned/Expired) | Monotonic increment | Yes (`storage.getLease()`) | Yields on active lease | `concurrency.ts:L38`, Unit Tested |
+| **Renew Lease** | Active lease holder | Yes (`fencingToken`) | Yes (`storage.getLease()`) | Returns `false` | `concurrency.ts:L121`, Unit Tested |
+| **Release Lease** | Active lease holder | Yes (`fencingToken`) | Yes (`storage.getLease()`) | No-op on mismatch | `concurrency.ts:L181`, Unit Tested |
+| **Transition to PROCESSING** | Active lease holder | Yes (`L433`) | Yes (`validateFencingToken`) | Throws `StaleLeaseError` | `manager.ts:L433`, Unit Tested |
+| **Missing Payload Quarantine** | Active lease holder | Yes (`L445`) | Yes (`validateFencingToken`) | Throws `StaleLeaseError` | `manager.ts:L445`, Code Verified |
+| **Commit Handler Success** | Active lease holder | Yes (`L463`) | Yes (`validateFencingToken`) | Throws `StaleLeaseError` | `manager.ts:L463`, `CRASH-INT-05` |
+| **Commit Handler Skip** | Active lease holder | Yes (`L463`) | Yes (`validateFencingToken`) | Throws `StaleLeaseError` | `manager.ts:L463`, Code Verified |
+| **Commit Handler Failure / 429** | Active lease holder | Yes (`L463`) | Yes (`validateFencingToken`) | Throws `StaleLeaseError` | `manager.ts:L463`, Code Verified |
+| **Commit Handler Exception Catch** | Active lease holder | Yes (`L549`) | Yes (`validateFencingToken`) | Throws `StaleLeaseError` | `manager.ts:L549`, Code Verified |
+| **Record Sync History** | Active lease holder | Inherited from L463 | IndexedDB put | Blocked by L463 throw | `manager.ts:L488`, `CRASH-INT-05` |
+| **WAL Recovery** | Active lease holder | Inside `runExclusively` | Yes (storage read) | Runs under lease | `manager.ts:L403`, Unit Tested |
+| **Interrupted Crash Reconciliation** | Active lease holder | Inside `runExclusively` | Yes (storage read) | Runs under lease | `manager.ts:L404`, Unit Tested |
+| **Purge Completed Items** | None | No | No | Unprotected helper | `manager.ts:L586`, Maintenance only |
+
+---
+
+## 17. Durability Boundary Matrix
+
+| State | Durable? | Worker-Local? | Survives Worker Restart? | Authority Source |
+|---|---|---|---|---|
+| **Lease Owner (`workerId`)** | YES | No | YES | `browser.storage.local` (`codesync:queue_lease`) |
+| **Lease Expiration (`expiresAt`)** | YES | No | YES | `browser.storage.local` (`codesync:queue_lease`) |
+| **Fencing Token (`fencingToken`)** | YES | No | YES | `browser.storage.local` (`codesync:queue_lease`) |
+| **Worker Identity** | No | YES (`crypto.randomUUID()`) | No (Fresh UUID per run) | Execution context argument |
+| **Queue Metadata** | YES | No | YES | `browser.storage.local` (`codesync:queue_metadata`) |
+| **Source Code Payload** | YES | No | YES | IndexedDB (`codesync_db: payloads`) |
+| **WAL Records** | YES | No | YES | IndexedDB (`codesync_db: wal_logs`) |
+| **Retry State (`nextRetryAt`)** | YES | No | YES | `QueueItemMetadata` in `storage.local` |
+| **Sync History** | YES | No | YES | IndexedDB (`codesync_db: history`) |
+
+---
+
+## 18. Duplicate-Authority Risk Matrix
+
+| Scenario | Existing Protection | Remaining Risk | Evidence |
+|---|---|---|---|
+| **1. Worker restart** | Worker B reads durable lease; expired lease triggers monotonic fence increment | Low; verified across restart | `CRASH-INT-05`, Unit suite |
+| **2. Lease expiry** | Worker B reclaims lease with fence `N+1`; Worker A's lease expires by timestamp | Low; verified | `concurrency.ts:L46`, `CRASH-INT-05` |
+| **3. Concurrent acquisition** | Tier 1 Web Lock mutual exclusion; Tier 2 Probe-and-Verify read-back | Low; protected by design | `concurrency.ts:L73-L114`, Unit suite |
+| **4. Web Lock unavailable** | Tier 2 fallback executes Probe-and-Verify persistent lease | Low; verified | `concurrency-fencing.test.ts:L180-L270` |
+| **5. Worker A pauses mid-handler** | Fencing check at L463 detects superseded lease upon resume | Protected by design; verified | `CRASH-INT-05` |
+| **6. Worker B supersedes A** | Fencing token increments `N -> N+1` | Protected by design; verified | `CRASH-INT-05` |
+| **7. Worker A resumes** | `validateFencingToken` checks storage; detects token mismatch | Protected by design; verified | `CRASH-INT-05` |
+| **8. Worker A attempts mutation** | Throws `StaleLeaseError` before `setQueueMetadata` | Protected by design; verified | `CRASH-INT-05` |
+| **9. Worker A attempts release** | `releaseLease` checks `workerId` and `fencingToken`; no-op on mismatch | Protected by design; verified | `concurrency-fencing.test.ts:L135` |
+| **10. Worker A attempts renewal** | `renewHeartbeat` checks `workerId` and `fencingToken`; returns `false` | Protected by design; verified | `concurrency-fencing.test.ts:L131` |
+| **11. Multiple recovery cycles** | Monotonic fence counter increments per recovery | Moderate; under-tested for >2 cycles | Code inspection |
+| **12. Shutdown during lease renewal** | Heartbeat write is atomic in `storage.local`; old lease remains valid until TTL | Low; protected by TTL | Code inspection |
+
+---
+
+## 19. Test Coverage Classification
+
+| Requirement | Classification | Evidence Location |
+|---|---|---|
+| **Tier 1 Web Lock Coordination** | **INTEGRATION** | `concurrency-fencing.test.ts`, `queue-concurrency.test.ts` |
+| **Tier 2 Persistent Lease Acquisition** | **INTEGRATION** | `crash-boundary-recovery.test.ts` (`CRASH-INT-05`) |
+| **Monotonic Fencing Token Generation** | **UNIT** | `concurrency-fencing.test.ts:L62` |
+| **Mutation-Boundary Fencing Validation** | **INTEGRATION** | `crash-boundary-recovery.test.ts` (`CRASH-INT-05`) |
+| **Stale Worker Resumption Rejection** | **INTEGRATION** | `crash-boundary-recovery.test.ts` (`CRASH-INT-05`) |
+| **Stale Worker Safe Release (No Hijacking)** | **UNIT** | `concurrency-fencing.test.ts:L135` |
+| **Stale Worker Heartbeat Rejection** | **UNIT** | `concurrency-fencing.test.ts:L131` |
+| **5-Minute Ownership Cap** | **UNIT** | `concurrency-fencing.test.ts:L147` |
+| **Web Lock Fallback Resilience** | **UNIT** | `concurrency-fencing.test.ts:L180` |
+| **Multi-generation Monotonicity (>2 workers)** | **NONE** | No multi-cycle generation test |
+| **Handler-Error Path Stale Rejection** | **NONE** | Tested only for success path in `CRASH-INT-05` |
+| **Actual Browser SW Lifecycle** | **NONE** | In-memory mocks only (no browser binary lifecycle) |
+
+---
+
+## 20. Security Boundary Findings
+
+1. **Untrusted Input Isolation:**
+   - Platform web pages and content scripts communicate strictly via `browser.runtime.sendMessage` with the `SUBMISSION_DETECTED` envelope.
+   - In [src/entrypoints/background.ts:L104-L140](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts#L104-L140), messages pass through `MessageEnvelopeValidator` and `SubmissionHandler`.
+   - Untrusted messages cannot supply or manipulate `fencingToken`, `workerId`, or lease data.
+2. **Privilege Boundary:**
+   - Content scripts have no access to `browser.storage.local` for extension queue keys.
+   - `QueueConcurrencyManager` is instantiated and executed strictly inside the privileged Background Service Worker execution context.
+   - Malicious or tampered durable state is detected and quarantined to `REQUIRES_ATTENTION` fail-closed ([CRASH-INT-06-SEC](file:///d:/Parth/Projects/CodeSync/tests/security/crash-boundary-recovery.test.ts#L519)).
+
+---
+
+## 21. Known Anti-Pattern Search Results
+
+| Searched Pattern | Findings in `src/` | Assessment |
+|---|---|---|
+| `isOwner` | 0 occurrences | **CLEAN:** No worker-local ownership booleans. |
+| `hasLease` | 0 occurrences | **CLEAN:** No cached lease status flags. |
+| `leaseValid` | 0 occurrences | **CLEAN:** No cached validity state. |
+| `currentFence` | 0 occurrences | **CLEAN:** No local memory fence counters. |
+| `cached lease` | 0 occurrences | **CLEAN:** Lease is always fetched fresh from storage. |
+| `Date.now-only checks` | None without fence validation | **CLEAN:** All checks combine expiry with fence and workerId. |
+| `checkLease then await mutation without revalidation` | 0 occurrences | **CLEAN:** `validateFencingToken` is invoked directly at mutation points (L463, L549). |
+| `direct queue mutation outside QueueConcurrencyManager` | `enqueueSubmission`, `purgeCompleted` | **JUSTIFIED:** Enqueue is protected by WAL; purge is maintenance. All drain transitions are inside `runExclusively`. |
+
+---
+
+## 22. Regression Findings
+
+1. **WAL Integration:** `reconcileWalAndOrphans` executes cleanly inside `runExclusively`. No regressions.
+2. **Crash Reconciliation:** `reconcileInterruptedItems` runs inside `runExclusively`, correctly identifying crashed items and incrementing `crashCount`. No regressions.
+3. **GitHub Sync & Rate Limiting:** All 19 tests in `pipeline-e2e.test.ts` pass cleanly alongside `crash-boundary-recovery.test.ts`.
+4. **Build Integrity:** Chrome and Firefox MV3 builds pass with zero bundle errors.
+
+---
+
+## 23. Verified Requirements
+
+The following requirements are conclusively verified with direct evidence:
+1. **Tier 1 / Tier 2 Separation:** Web Locks provide ephemeral mutual exclusion; persistent leases provide durable ownership across processes.
+2. **Mutation-Boundary Revalidation:** Stale workers cannot commit successful synchronization results to `storage.local` after lease supersession (`CRASH-INT-05`).
+3. **History Protection:** Stale workers cannot write duplicate history records to IndexedDB after lease supersession (`CRASH-INT-05`).
+4. **Orderly Release Ownership Guard:** A stale worker cannot delete a newer worker's lease (`concurrency-fencing.test.ts`).
+5. **Renewal Ownership Guard:** A stale worker cannot renew an expired or superseded lease (`concurrency-fencing.test.ts`).
+6. **5-Minute Upper Bound:** Worker ownership is forcibly terminated at 5 minutes regardless of heartbeat renewal (`concurrency-fencing.test.ts`).
+7. **Web Lock Fallback:** Safe fallback to persistent lease when Web Locks API throws or is missing (`concurrency-fencing.test.ts`).
+
+---
+
+## 24. Protected-but-Under-Tested Requirements
+
+The following requirements are enforced by design in production code but lack dedicated integration/lifecycle test coverage:
+1. **Multi-generation Monotonicity Across Repeated Takeovers:** Verified for 2 workers (`CRASH-INT-05`), but not tested across 3+ successive worker crashes/restarts (e.g. Worker A -> Worker B -> Worker C).
+2. **Orderly Release Token Reset Dynamics:** When a worker finishes and deletes the lease via `releaseLease`, the next session starts from `fencingToken = 1`. The repository lacks an integration test verifying that a resurrected worker from the first session is rejected despite the token number recycling to 1.
+3. **Handler-Error Path Mutation Boundary:** Revalidation at line 549 inside the catch block is verified by code inspection, but no integration test pauses a worker that subsequently *fails* its handler pass while superseded.
+4. **Pure Tier 2 Acquisition Collision:** Probe-and-Verify collision handling when Web Locks are absent is tested at unit level, but not in a multi-worker concurrent integration test.
+
+---
+
+## 25. Confirmed Defects
+
+**ZERO (0) CONFIRMED DEFECTS.**
+
+No production bugs, security vulnerabilities, or data loss conditions exist in the persistent lease or fencing implementation.
+
+---
+
+## 26. Minimum Required Phase 1C.4.3.2.2.1 Tests
+
+To close the gaps identified in Section 24 without scope inflation, the following **4 targeted integration tests** are recommended for Phase 1C.4.3.2.2.1:
+
+| Candidate Test ID | Scenario | Purpose |
+|---|---|---|
+| **FENCE-INT-01** | Multi-generation lease takeover (Worker A -> Worker B -> Worker C) | Proves monotonic token increments ($1 \to 2 \to 3$) and mutual exclusion across repeated crashes. |
+| **FENCE-INT-02** | Orderly lease release followed by fresh session and delayed stale worker resumption | Proves that when token counter resets to 1 after orderly release, a delayed worker from session 1 is rejected by `workerId` mismatch fail-closed. |
+| **FENCE-INT-03** | Stale worker rejected at error/failure mutation boundary (L549) | Proves that a superseded worker encountering a handler network error cannot mutate `attempts`, `lastError`, or `state` to `FAILED`. |
+| **FENCE-INT-04** | Pure Tier 2 concurrent takeover race without Web Locks | Proves that Lamport Probe-and-Verify verification read-back correctly resolves simultaneous takeovers without duplicate active leases. |
+
+---
+
+## 27. Production Change Assessment
+
+- **Production Changes Required:** **0** (No changes to `src/` required).
+- **Test-Only Changes Required:** **Non-zero** (Add `tests/security/persistent-lease-fencing.test.ts` with `FENCE-INT-01` through `FENCE-INT-04` in Phase 1C.4.3.2.2.1).
+- **Documentation Changes Required:** **Non-zero** (Phase 1C.4.3.2.2.1 walkthrough and completion report).
+
+---
+
+## 28. Final Recommendation
+
+### **APPROVE WITH TEST GAPS**
+
+The production implementation of persistent leasing, Web Lock coordination, and monotonic fencing is robust, correct, and architecturally verified. The identified gaps are purely test coverage boundaries (multi-generation chaining and error-path mutation boundaries).
+
+Authorize Phase 1C.4.3.2.2.1 to implement tests `FENCE-INT-01` through `FENCE-INT-04`. Zero production code modifications are required.

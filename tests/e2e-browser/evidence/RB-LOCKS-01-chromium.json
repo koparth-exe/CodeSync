@@ -1,0 +1,29 @@
+{
+  "testId": "RB-LOCKS-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:11.276Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "crossContextContentionDemonstrated": true,
+    "tab1AcquiredFirst": true,
+    "tab2BlockedDuringHold": true,
+    "tab2AcquiredAfterRelease": true,
+    "lockSnapshot": {
+      "heldCount": 1,
+      "pendingCount": 1
+    }
+  },
+  "relevantStorageState": {
+    "navigatorLocksAvailable": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "REAL_NAVIGATOR_LOCKS_EXCLUSIVE_ACQUISITION",
+    "CROSS_CONTEXT_LOCK_CONTENTION",
+    "SECOND_CONTENDER_BLOCKED_DURING_HOLD",
+    "EXCLUSIVE_LOCK_GRANTED_AFTER_RELEASE"
+  ]
+}

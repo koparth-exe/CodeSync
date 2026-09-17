@@ -1,0 +1,27 @@
+{
+  "testId": "RB-SECURITY-02",
+  "browser": "firefox",
+  "browserVersion": "155.0",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:22:45.620Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "hostilePageAccess": {
+      "hasBrowser": false,
+      "hasChrome": false,
+      "hasRuntime": false,
+      "hasStorage": false
+    },
+    "runtimeIsolated": true
+  },
+  "relevantStorageState": {
+    "storageInaccessibleToWebPage": true
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "FIREFOX_HOSTILE_PAGE_PRIVILEGE_ISOLATION",
+    "FIREFOX_RUNTIME_API_UNEXPOSED",
+    "FIREFOX_STORAGE_UNEXPOSED_TO_WEB"
+  ]
+}

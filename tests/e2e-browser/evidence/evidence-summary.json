@@ -1,0 +1,428 @@
+{
+  "totalRecords": 14,
+  "generatedAt": "2026-09-17T16:23:00.440Z",
+  "records": [
+    {
+      "testId": "RB-DRAIN-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:21:56.039Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "alarmName": "codesync_queue_drain_alarm",
+        "alarmPeriodInMinutes": 5,
+        "hasAlarmListener": true,
+        "queueStateAfterDrain": "requires_attention"
+      },
+      "relevantStorageState": {
+        "alarmDrainProcessed": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "ALARM_CONFIGURATION_5_MINUTES_AUTHORITATIVE",
+        "ALARM_DISPATCH_TRIGGERS_BACKGROUND_DRAIN",
+        "QUEUEDRAINER_INVOKED_ON_ALARM"
+      ]
+    },
+    {
+      "testId": "RB-INSTALL-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:21:57.217Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "extensionId": "mcfbcmplcolffmpkkgjookmdfgfohlik",
+        "serviceWorkerUrl": "chrome-extension://mcfbcmplcolffmpkkgjookmdfgfohlik/background.js",
+        "isRunning": true
+      },
+      "relevantStorageState": {
+        "permissionsGranted": ["storage", "alarms"],
+        "hostPermissionsGranted": [
+          "https://github.com/*",
+          "https://api.github.com/*"
+        ]
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "CHROMIUM_MV3_MANIFEST_ACCEPTED",
+        "BACKGROUND_SERVICE_WORKER_REGISTERED",
+        "PERMISSIONS_STORAGE_ALARMS_ACCEPTED",
+        "HOST_PERMISSIONS_GITHUB_ACCEPTED"
+      ]
+    },
+    {
+      "testId": "RB-INSTALL-02",
+      "browser": "firefox",
+      "browserVersion": "155.0",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:03.846Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "extensionId": "codesync@extension.local",
+        "installedViaBiDi": true
+      },
+      "relevantStorageState": {
+        "geckoId": "codesync@extension.local",
+        "strictMinVersion": "128.0"
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "FIREFOX_MV3_MANIFEST_ACCEPTED",
+        "GECKO_EXTENSION_ID_VERIFIED",
+        "BACKGROUND_SCRIPTS_ARRAY_ACCEPTED",
+        "STRICT_MIN_VERSION_128_ACCEPTED"
+      ]
+    },
+    {
+      "testId": "RB-LIFECYCLE-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:09.223Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "workerTerminatedViaCDP": true,
+        "cdpStatusTransitions": [
+          "running",
+          "stopping",
+          "stopped",
+          "starting",
+          "starting",
+          "starting",
+          "running"
+        ],
+        "recoveredState": "requires_attention",
+        "crashCount": 1
+      },
+      "relevantStorageState": {
+        "fencingTokenEnforced": "[REDACTED_PRESENCE_ONLY]",
+        "staleWorkerRejected": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "CDP_SERVICE_WORKER_TERMINATION",
+        "CDP_SERVICE_WORKER_STARTUP",
+        "CRASH_COUNT_INCREMENTED_ON_RESTART",
+        "PROCESSING_ITEM_RECONCILED",
+        "STALE_WORKER_FENCING_TOKEN_ENFORCEMENT"
+      ]
+    },
+    {
+      "testId": "RB-LOCKS-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:11.276Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "crossContextContentionDemonstrated": true,
+        "tab1AcquiredFirst": true,
+        "tab2BlockedDuringHold": true,
+        "tab2AcquiredAfterRelease": true,
+        "lockSnapshot": {
+          "heldCount": 1,
+          "pendingCount": 1
+        }
+      },
+      "relevantStorageState": {
+        "navigatorLocksAvailable": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "REAL_NAVIGATOR_LOCKS_EXCLUSIVE_ACQUISITION",
+        "CROSS_CONTEXT_LOCK_CONTENTION",
+        "SECOND_CONTENDER_BLOCKED_DURING_HOLD",
+        "EXCLUSIVE_LOCK_GRANTED_AFTER_RELEASE"
+      ]
+    },
+    {
+      "testId": "RB-MSG-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:13.481Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "hasMessageListeners": true,
+        "validMessageTested": true,
+        "malformedRejected": true,
+        "privilegeEscalationBlocked": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "CONTENT_SCRIPT_TO_BACKGROUND_IPC",
+        "ASYNC_RESPONSE_CHANNEL_LIFETIME",
+        "MALFORMED_NONCE_REJECTED",
+        "NO_PRIVILEGE_ESCALATION_BEYOND_ALLOWLIST"
+      ]
+    },
+    {
+      "testId": "RB-NET-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:14.964Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "serviceWorkerFetchSuccess": true,
+        "abortSignalHandled": true,
+        "abortErrorName": "AbortError"
+      },
+      "relevantNetworkResults": {
+        "receivedMethod": "POST",
+        "receivedAcceptHeader": "application/vnd.github.v3+json",
+        "authorizationHeaderPresent": "[REDACTED_PRESENCE_ONLY]"
+      },
+      "invariantsExercised": [
+        "SERVICE_WORKER_ORIGIN_FETCH",
+        "CUSTOM_HEADERS_PRESERVED",
+        "CACHE_NO_STORE_HONORED",
+        "ABORT_CONTROLLER_SIGNAL_HANDLED",
+        "ZERO_LIVE_GITHUB_TRAFFIC"
+      ],
+      "notes": "Local mock server proved Service Worker fetch protocol, headers, no-store, and abort behavior. Per Zero-Live-Traffic safety invariant, actual api.github.com host permission boundary remains verified via manifest host_permissions parsing without external live traffic."
+    },
+    {
+      "testId": "RB-ORIGIN-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:21.965Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "testResults": [
+          {
+            "url": "https://leetcode.com/problems/two-sum/",
+            "type": "supported_exact",
+            "injected": true,
+            "expected": true
+          },
+          {
+            "url": "https://www.leetcode.com/problems/two-sum/",
+            "type": "supported_www",
+            "injected": true,
+            "expected": true
+          },
+          {
+            "url": "https://fakeleetcode.com/problems/two-sum/",
+            "type": "unauthorized_lookalike",
+            "injected": false,
+            "expected": false
+          },
+          {
+            "url": "https://leetcode.com.attacker.com/problems/two-sum/",
+            "type": "unauthorized_suffix_domain",
+            "injected": false,
+            "expected": false
+          },
+          {
+            "url": "https://api.leetcode.com/problems/two-sum/",
+            "type": "unauthorized_subdomain",
+            "injected": false,
+            "expected": false
+          },
+          {
+            "url": "https://example.com/problems/two-sum/",
+            "type": "unrelated_origin",
+            "injected": false,
+            "expected": false
+          }
+        ],
+        "exactOriginInjected": true,
+        "lookalikeOriginRejected": true,
+        "subdomainOriginRejected": true
+      },
+      "relevantStorageState": {
+        "manifestMatchPatternsEnforced": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "CONTENT_SCRIPT_EXACT_ORIGIN_INJECTION",
+        "LOOKALIKE_ORIGIN_INJECTION_REJECTED",
+        "UNAUTHORIZED_SUBDOMAIN_INJECTION_REJECTED",
+        "VALIDATE_PLATFORM_ORIGIN_PARITY"
+      ]
+    },
+    {
+      "testId": "RB-PERSIST-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:25.049Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "profileDirReused": true,
+        "browserRestartCompleted": true
+      },
+      "relevantStorageState": {
+        "metadataSurvived": true,
+        "configSurvived": true
+      },
+      "relevantIndexedDBState": {
+        "payloadSurvived": true,
+        "walSurvived": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "STORAGE_LOCAL_DURABILITY_ACROSS_RESTART",
+        "INDEXEDDB_PAYLOAD_DURABILITY_ACROSS_RESTART",
+        "INDEXEDDB_WAL_DURABILITY_ACROSS_RESTART"
+      ]
+    },
+    {
+      "testId": "RB-PERSIST-02",
+      "browser": "firefox",
+      "browserVersion": "155.0",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:38.322Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "profileDir": "C:\\Users\\Tejasvini\\AppData\\Local\\Temp\\codesync-ff-persist-HLyRs4",
+        "restartedWithSameProfile": true
+      },
+      "relevantStorageState": {
+        "firefoxStorageDirectoryPresent": true,
+        "webExtensionStoragePreserved": true
+      },
+      "relevantIndexedDBState": {
+        "geckoIdbSqlitePresent": true,
+        "geckoIdbSqliteSurviving": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "FIREFOX_GECKO_INDEXEDDB_INITIALIZATION",
+        "FIREFOX_STORAGE_LOCAL_SQLITE_PERSISTENCE",
+        "FIREFOX_PROFILE_SHUTDOWN_DURABILITY"
+      ]
+    },
+    {
+      "testId": "RB-SECURITY-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:40.515Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "hostilePageApiAccess": {
+          "hasChromeRuntime": false,
+          "hasInternalId": false,
+          "hasOnMessage": false,
+          "hasStorage": false
+        },
+        "swPrototypeClean": true,
+        "inlineScriptBlocked": true,
+        "externalScriptBlocked": true
+      },
+      "relevantStorageState": {
+        "storageRestrictedToExtension": true
+      },
+      "consoleErrors": [
+        "Executing inline script violates the following Content Security Policy directive 'script-src 'self''. Either the 'unsafe-inline' keyword, a hash ('sha256-Gg5eGBmwbye15StJCroacVdiK3j/3liucUX6x9lm9k0='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+        "Executing inline script violates the following Content Security Policy directive 'script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*'. Either the 'unsafe-inline' keyword, a hash ('sha256-Gg5eGBmwbye15StJCroacVdiK3j/3liucUX6x9lm9k0='), or a nonce ('nonce-...') is required to enable inline execution. The action has been blocked.",
+        "Loading the script 'https://example-evil.com/malicious.js' violates the following Content Security Policy directive: \"script-src 'self'\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked.",
+        "Loading the script 'https://example-evil.com/malicious.js' violates the following Content Security Policy directive: \"script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:*\". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback. The action has been blocked."
+      ],
+      "invariantsExercised": [
+        "HOSTILE_PAGE_PRIVILEGE_ISOLATION",
+        "PROTOTYPE_POLLUTION_CONTAINMENT",
+        "EXTENSION_CSP_EVAL_FORBIDDEN",
+        "EXTENSION_CSP_INLINE_SCRIPT_REJECTED"
+      ]
+    },
+    {
+      "testId": "RB-SECURITY-02",
+      "browser": "firefox",
+      "browserVersion": "155.0",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:45.620Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "hostilePageAccess": {
+          "hasBrowser": false,
+          "hasChrome": false,
+          "hasRuntime": false,
+          "hasStorage": false
+        },
+        "runtimeIsolated": true
+      },
+      "relevantStorageState": {
+        "storageInaccessibleToWebPage": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "FIREFOX_HOSTILE_PAGE_PRIVILEGE_ISOLATION",
+        "FIREFOX_RUNTIME_API_UNEXPOSED",
+        "FIREFOX_STORAGE_UNEXPOSED_TO_WEB"
+      ]
+    },
+    {
+      "testId": "RB-STARTUP-01",
+      "browser": "chromium",
+      "browserVersion": "153.0.8010.12",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:47.640Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "alarmRegistered": true,
+        "alarmName": "codesync_queue_drain_alarm",
+        "alarmPeriodInMinutes": 5,
+        "hasMessageListener": true
+      },
+      "relevantStorageState": {
+        "storageLocalAccessible": true
+      },
+      "relevantIndexedDBState": {
+        "indexedDBAccessible": true,
+        "objectStores": ["history", "payloads", "wal_logs"]
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "CHROMIUM_SERVICE_WORKER_INITIALIZATION",
+        "STORAGE_LOCAL_SW_ACCESS",
+        "INDEXEDDB_CODESYNC_DB_STORES_INITIALIZED",
+        "ALARM_CODESYNC_QUEUE_DRAIN_5MIN_REGISTERED",
+        "RUNTIME_MESSAGE_LISTENERS_REGISTERED"
+      ]
+    },
+    {
+      "testId": "RB-STARTUP-02",
+      "browser": "firefox",
+      "browserVersion": "155.0",
+      "extensionVersion": "0.1.0",
+      "manifestVersion": 3,
+      "timestamp": "2026-09-17T16:22:53.160Z",
+      "status": "PASS",
+      "relevantRuntimeState": {
+        "extensionId": "codesync@extension.local",
+        "backgroundActive": true,
+        "browsingContextReady": true
+      },
+      "relevantStorageState": {
+        "manifestBackgroundType": "scripts",
+        "geckoStorageInitialized": true,
+        "extensionStorageDirPresent": true
+      },
+      "consoleErrors": [],
+      "invariantsExercised": [
+        "FIREFOX_BACKGROUND_INITIALIZATION",
+        "FIREFOX_EVENT_PAGE_LIFECYCLE",
+        "FIREFOX_GECKO_STORAGE_CREATION"
+      ]
+    }
+  ]
+}

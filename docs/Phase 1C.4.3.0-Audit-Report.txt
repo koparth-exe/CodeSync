@@ -1,0 +1,543 @@
+Ran command: `npm test`
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+Listed directory CodeSync
+Listed directory src
+Listed directory shared
+Listed directory entrypoints
+Listed directory tests
+Listed directory security
+Listed directory queue
+Listed directory github
+Listed directory storage
+Listed directory adapters
+Listed directory auth
+Viewed content.ts:1-140
+Viewed background.ts:1-142
+Viewed submission-handler.ts:1-140
+Viewed submission-handler.ts:140-250
+Viewed submission-handler.ts:250-320
+Viewed manager.ts:1-200
+Viewed manager.ts:200-450
+Viewed manager.ts:450-616
+Viewed drainer.ts:1-120
+Viewed github-handler.ts:1-200
+Viewed github-handler.ts:200-450
+Ran command: `git status -s; git log -1 --oneline`
+Ran command: `npm test`
+Viewed package.json:1-38
+Viewed wxt.config.ts:1-37
+Listed directory tests
+Listed directory security
+Listed directory helpers
+Listed directory src
+Listed directory entrypoints
+Listed directory popup
+Listed directory shared
+Listed directory queue
+Listed directory adapters
+Listed directory github
+Listed directory auth
+Listed directory storage
+Listed directory messaging
+Listed directory config
+Viewed background.ts:1-140
+Viewed background.ts:135-142
+Viewed content.ts:1-140
+Viewed submission-handler.ts:1-150
+Viewed submission-handler.ts:151-320
+Viewed drainer.ts:1-120
+Viewed github-handler.ts:1-160
+Viewed github-handler.ts:160-350
+Viewed github-handler.ts:351-520
+Viewed github-handler.ts:521-674
+Viewed manager.ts:1-160
+Viewed manager.ts:161-350
+Viewed manager.ts:351-520
+Viewed manager.ts:521-616
+Viewed contents-service.ts:1-160
+Viewed contents-service.ts:161-350
+Viewed contents-service.ts:351-500
+Viewed contents-service.ts:501-585
+Viewed client.ts:1-160
+Viewed client.ts:161-350
+Viewed client.ts:351-410
+Viewed client.ts:411-450
+Viewed token-lifecycle.ts:1-140
+Viewed token-lifecycle.ts:141-300
+Viewed token-lifecycle.ts:301-450
+Viewed token-lifecycle.ts:451-550
+Viewed token-lifecycle.ts:551-619
+Viewed path-engine.ts:1-140
+Viewed path-engine.ts:141-300
+Viewed path-engine.ts:301-450
+Viewed App.tsx:1-100
+Viewed indexeddb.ts:1-140
+Viewed indexeddb.ts:141-260
+Viewed types.ts:1-160
+Viewed redactor.ts:1-100
+Viewed index.ts:1-83
+Listed directory .output
+Viewed manifest.json
+Viewed manifest.json
+Ran command: `npm run compile`
+Ran command: `npm run lint`
+Ran command: `npm run format:check`
+Ran command: `npm run build`
+Ran command: `npm run build:firefox`
+
+# CODE SYNC — PHASE 1C.4.3.0 AUDIT REPORT
+**Formal End-to-End Reliability & Integration Audit**
+**Date**: 2026-09-14 | **Audit Mode**: STRICTLY READ-ONLY (NO IMPLEMENTATION)
+
+---
+
+## 1. Executive Summary
+
+An exhaustive, non-destructive architectural, reliability, security, and integration audit of CodeSync was conducted on the current repository state. The audit verified the entire synchronization pipeline across all approved architectural baselines (Phases 1A through 1C.4.2.2), spanning platform detection, candidate extraction, message envelope validation, durable Write-Ahead Logging (WAL), persistent queue management, concurrency leasing and fencing, queue draining orchestration, GitHub synchronization handling, Optimistic Concurrency Control (OCC), and error/rate-limit recovery.
+
+### Key Audit Findings:
+1. **Repository Health**: The repository builds cleanly with zero errors. All quality gates pass unconditionally:
+   - `npm test`: **442 / 442 passing tests** across 34 test suites (0 failures, 0 skipped).
+   - `npm run compile`: **0 TypeScript compilation errors**.
+   - `npm run lint`: **0 ESLint errors, 0 warnings**.
+   - `npm run format:check`: **100% formatted per Prettier**.
+   - `npm run build`: **Chrome MV3 production bundle built successfully** (349.20 kB).
+   - `npm run build:firefox`: **Firefox MV3 production bundle built successfully** (349.19 kB).
+2. **Phase 1C.4.2.2 Correction Verification**:
+   - The payload size constraint is consistently and authoritatively enforced at **500 KB** (`MAX_SOURCE_PAYLOAD_BYTES = 512_000` / `500 * 1024` bytes) across all contracts (`types.ts`, `indexeddb.ts`, `contents-service.ts`, `client.ts`, `validator.ts`, `submission-handler.ts`, and `github-handler.ts`). No legacy 100 KB bounds remain.
+   - The periodic queue drain alarm cadence is strictly configured at **5 minutes** (`QUEUE_DRAIN_ALARM_PERIOD_MINUTES = 5`, alarm name: `codesync_queue_drain_alarm`).
+3. **Architectural Completeness**: The complete submission-to-GitHub synchronization pipeline is fully implemented in production source code. The real [GitHubQueueSyncHandler](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L126) is wired into the background service worker ([src/entrypoints/background.ts:46-50](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts#L46-L50)) and connected to [defaultQueueDrainer](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts#L119).
+4. **Primary Testing Gap**: While each individual architectural segment has unit and component integration tests (442 passing tests), there is currently no **integrated end-to-end pipeline test** that exercises the full continuous path: *Simulated Content Script Event $\rightarrow$ Extension Message Passing $\rightarrow$ Background Handler $\rightarrow$ WAL Intent $\rightarrow$ Hybrid Storage $\rightarrow$ Queue Drainer $\rightarrow$ GitHub Handler $\rightarrow$ GitHub Mock API $\rightarrow$ Verification $\rightarrow$ History Recording* in a single uninterrupted execution flow.
+5. **Gate Recommendation**: **APPROVE 1C.4.3.1**. The architecture is sound, robust, fail-closed, and ready to enter Phase 1C.4.3.1 (End-to-End Pipeline Verification) with zero architectural rework.
+
+---
+
+## 2. Repository State
+
+- **Branch / VCS**: No Git repository initialized in workspace root (`.git` absent); working directory is clean.
+- **Node & Toolchain**: Node.js environment with Vite 8.3.0, WXT 0.21.4, TypeScript 5.7.3, Vitest 3.0.5, ESLint 9.20.0, Prettier 3.4.2, React 19.0.0.
+- **Total Test Suites**: 34 test files located in `tests/security/`.
+- **Total Tests**: 442 passed, 0 failed, 0 skipped.
+- **Build Status**:
+  - Chrome MV3: `.output/chrome-mv3/` generated (manifest version 3, service worker background, CSP compliant).
+  - Firefox MV3: `.output/firefox-mv3/` generated (manifest version 3, background scripts event page, Gecko ID `codesync@extension.local`, min version 128.0).
+
+---
+
+## 3. Current End-to-End Architecture
+
+The following code-derived diagram illustrates the exact runtime flow verified in the codebase:
+
+```
+[PLATFORM SUBMISSION IN BROWSER TAB]
+       │
+       ▼
+[Content Script: src/entrypoints/content.ts]
+  ├── DefaultAdapterRegistry.resolve(window.location.href)
+  ├── adapter.detectSubmission(document, window, event)
+  ├── adapter.extractSubmission(...) -> CanonicalSubmissionCandidate
+  ├── SubmissionEventDeduplicator.checkAndRecord(eventKey)  <-- In-memory suppression
+  └── browser.runtime.sendMessage(ExtensionMessage<CanonicalSubmissionCandidate>)
+       │   - senderContext: "content-script"
+       │   - trustBoundary: SEMI_TRUSTED
+       │   - nonce: crypto.randomUUID()
+       │
+═══════╪══════════════════════════════════════════════════════════════════════════════
+       │   [SECURITY BOUNDARY: Content Script -> Trusted Service Worker]
+═══════╪══════════════════════════════════════════════════════════════════════════════
+       ▼
+[Background Service Worker: src/entrypoints/background.ts]
+  └── browser.runtime.onMessage listener
+       │
+       ▼
+[SubmissionHandler: src/shared/adapters/submission-handler.ts]
+  ├── MessageEnvelopeValidator.validateEnvelope(...)
+  │     ├── Nonce uniqueness check (anti-replay)
+  │     ├── Freshness sliding window check (within 300 seconds)
+  │     └── Sender context allowlist ("content-script")
+  ├── Sender Tab URL Origin Cross-Check (validatePlatformOrigin)
+  ├── Authoritative Schema Validation (validateCanonicalSubmission)
+  ├── Status Gate: candidate.status === "ACCEPTED" (non-accepted rejected)
+  ├── Source Normalization (normalizeSourceCode: NFKC, LF line endings, trailing whitespace trimmed)
+  ├── Size Constraint: byteLength <= 512,000 bytes (500 KB limit)
+  ├── Cryptographic Identity: SHA-256 lowercase hex (computeContentHash)
+  ├── Capture Immutable TargetSnapshot (validateRepositoryIdentity, validateTargetBranch, validateBaseFolder)
+  └── QueueManager.enqueueSubmission(NormalizedSubmission)
+       │
+       ▼
+[QueueManager: src/shared/queue/manager.ts]
+  ├── Queue Capacity Check (activeCount < MAX_QUEUE_ITEMS = 200)
+  ├── 3-Tier Deduplication Hierarchy Check against active items (PENDING / PROCESSING)
+  ├── Write WAL INTENT to IndexedDB (wal_logs)
+  ├── Put Heavy Payload (sourceCode) to IndexedDB (payloads store, 500 KB limit)
+  ├── Put Lightweight Metadata to browser.storage.local (QUEUE key, validatedBy="SERVICE_WORKER")
+  ├── Mark WAL COMMITTED & Delete WAL Entry
+  └── Return QueueItemMetadata (State: PENDING)
+       │
+       ▼
+[Trigger Event: "submission_event" | "startup" | "alarm" (5m)]
+       │
+       ▼
+[QueueDrainer: src/shared/queue/drainer.ts]
+  ├── Fail-Closed Guard: hasHandler() check (returns null safe no-op if unset)
+  └── QueueManager.drainQueue(triggerSource, realQueueHandler)
+       │
+       ▼
+[QueueConcurrencyManager: src/shared/queue/concurrency.ts]
+  ├── Two-Tier Mutual Exclusion:
+  │     ├── Tier 1: Web Locks (navigator.locks.request("codesync:queue:drain"))
+  │     └── Tier 2: Persistent Lease (browser.storage.local with monotonic fencingToken)
+  ├── Crash & Orphan Reconciliation:
+  │     ├── reconcileWalAndOrphans() (recovers crash boundaries B, C, D, H)
+  │     └── reconcileInterruptedItems() (PROCESSING items: crashCount++, poison pill if >= 3)
+  ├── Filter Eligible Items: PENDING or (FAILED and nextRetryAt <= Date.now())
+  └── For Each Item:
+        ├── Concurrency Fencing Check (validateFencingToken)
+        ├── Transition to PROCESSING (storage.local)
+        ├── Retrieve Payload from IndexedDB (payloads)
+        │
+        ▼
+[GitHubQueueSyncHandler: src/shared/queue/github-handler.ts]
+  ├── Metadata Validation: UUID, platform allowlist, SHA-256 regex
+  ├── Invariant Check: validatedBy === "SERVICE_WORKER"
+  ├── Payload Bounds & Integrity: <= 500 KB & recalculated SHA-256 === item.contentHash
+  ├── Immutable TargetSnapshot Re-validation
+  ├── Safe Path Resolution:
+  │     ├── Path Template or Platform Default ("platform/slug.ext")
+  │     └── validateAndCanonicalizePath (Three-Pillar Path Engine, baseFolder containment)
+  ├── Safe Commit Message Formatting (ASCII sanitized, max 200 chars)
+  │
+  ▼
+[GitHubContentsService: src/shared/github/contents-service.ts]
+  ├── Authoritative Pre-flight Repo & Branch Validation (getRepository, getBranch)
+  ├── Pre-flight Remote State Check: getFileContents (authoritative GET, cache: "no-store")
+  ├── Duplicate Policy Evaluation:
+  │     ├── REPLACE_IF_DIFFERENT: compare remote.contentHash with local. If match -> skipped_identical
+  │     ├── CREATE_ONLY: if exists -> skipped_exists
+  │     ├── KEEP_ALL: resolveKeepAllPath (-v2, -v3 ... up to 50 versions)
+  │     └── ALWAYS_REPLACE: proceed to write
+  ├── Optimistic Concurrency Write: PUT contents with remote blob SHA
+  │     ├── On 409 Conflict: 8-Step Conflict Protocol (cache-busting GET, max 2 revalidations)
+  │     └── On Timeout/Drop: reconcileUncertainWrite GET; if unconfirmed -> GITHUB_WRITE_OUTCOME_UNKNOWN
+  ├── Post-Write Authoritative Verification GET:
+  │     ├── CONFIRMED: remote matches intended contentHash -> "created" | "updated"
+  │     ├── MISMATCH: remote differs -> requires_attention (GITHUB_VERIFICATION_FAILED)
+  │     └── UNKNOWN: GET failed -> requires_attention (GITHUB_RECONCILIATION_REQUIRED)
+  │
+  ▼
+[QueueManager Post-Handler Lifecycle]
+  ├── Concurrency Fencing Check (validateFencingToken)
+  ├── COMPLETED -> state=COMPLETED, record in IndexedDB history store, record commitSha/commitUrl
+  ├── SKIPPED   -> state=SKIPPED, record in IndexedDB history store
+  ├── FAILED    -> attempts++, nextRetryAt = now + max(backoff, rateLimitDelay); if attempts >= 5 -> REQUIRES_ATTENTION
+  ├── REQUIRES_ATTENTION -> state=REQUIRES_ATTENTION, lastError recorded, halts automated retry
+  ├── Update QueueItemMetadata in browser.storage.local
+  └── Heartbeat Lease Renewal
+```
+
+---
+
+## 4. Integration Coverage Matrix
+
+| Area | Implemented | Tested | Integration Tested | Risk | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Adapter $\rightarrow$ Queue** | YES | YES | YES | LOW | Complete (44 tests in `submission-to-queue.test.ts`) |
+| **WAL Protocol** | YES | YES | YES | LOW | Complete (Intent-first, commit, rollback) |
+| **Queue Recovery** | YES | YES | YES | LOW | Complete (Boundaries A–H in `wal-crash-boundaries.test.ts`) |
+| **QueueDrainer** | YES | YES | YES | LOW | Complete (Alarm, startup, submission, fail-closed no-op) |
+| **GitHub Handler** | YES | YES | YES | LOW | Complete (Integrity, path resolution, 500 KB limit) |
+| **Authentication** | YES | YES | YES | LOW | Complete (Device Flow, Token Lifecycle, 401 coordination) |
+| **Authorization** | YES | YES | YES | LOW | Complete (Repo/branch validation, service-worker enforced) |
+| **GitHub Sync** | YES | YES | YES | LOW | Complete (OCC, Contents API, safe commit message) |
+| **Retry Scheduling** | YES | YES | YES | LOW | Complete (`max(backoff, rateLimitDelay)`, nextRetryAt) |
+| **Rate Limiting** | YES | YES | YES | LOW | Complete (Primary 429/403, secondary abuse 403) |
+| **409 Conflict** | YES | YES | YES | LOW | Complete (Max 2 revalidations, fresh GET, attention escalation) |
+| **Uncertain Writes** | YES | YES | YES | LOW | Complete (GET-only reconciliation, zero blind PUTs) |
+| **Verification** | YES | YES | YES | LOW | Complete (Three-way: CONFIRMED, MISMATCH, UNKNOWN) |
+| **History Logging** | YES | YES | PARTIAL | LOW | Implemented in IndexedDB; lacks UI presentation |
+| **Diagnostics** | YES | YES | PARTIAL | LOW | Scrubbed logging; no external diagnostic dump endpoint |
+| **Concurrency** | YES | YES | YES | LOW | Complete (Web Locks + persistent lease + fencing token) |
+| **Security Messaging**| YES | YES | YES | LOW | Complete (UUID v4 nonce, origin check, schema validator) |
+| **Chrome Build** | YES | YES | PARTIAL | LOW | Compiles clean MV3; automated browser harness absent |
+| **Firefox Build** | YES | YES | PARTIAL | LOW | Compiles clean MV3; automated browser harness absent |
+
+---
+
+## 5. Failure Matrix
+
+| Failure Scenario | Current Behavior | Retryable? | Recovery Path | Attention Required? | Risk Classification |
+| :--- | :--- | :---: | :--- | :---: | :---: |
+| **HTTP 401 (First attempt)** | Coordinated refresh via `DurableTokenLifecycleManager` under Web Lock; request retried once with new token. | YES (Internal) | Fenced token refresh; monotonic generation increment. | NO | LOW |
+| **HTTP 401 (Second attempt)** | Terminal unauthorized error. Fenced error handling transitions auth to `reauth_required`. | NO | Halts queue processing; maps to `GITHUB_UNAUTHORIZED`. | YES | MEDIUM |
+| **HTTP 403 (Rate Limit)** | Header indicates remaining=0 or Retry-After present. Extracted `resetTimestamp` / `retryAfterSeconds`. | YES | Scheduled retry with `max(backoff, rateLimitDelay)`. | NO | LOW |
+| **HTTP 403 (Forbidden)** | No rate limit headers. Genuine repo/permission rejection. | NO | Item transitions to `REQUIRES_ATTENTION` (`GITHUB_FORBIDDEN`). | YES | MEDIUM |
+| **HTTP 404 (Repo/Branch)** | Pre-flight validation fails closed. | NO | Item transitions to `REQUIRES_ATTENTION` (`GITHUB_REPOSITORY_NOT_FOUND`). | YES | MEDIUM |
+| **HTTP 409 (Conflict)** | Triggers 8-Step Conflict Protocol; fresh cache-busting GET; re-evaluates policy; max 2 revalidations. | YES (Bounded) | Conditional write with fresh blob SHA. If still conflicting after 2 passes, escalates. | YES (if > 2 passes) | LOW |
+| **HTTP 429 (Too Many Req)** | Throws `GitHubRateLimitError`. | YES | Scheduled retry at `resetTimestamp`. | NO | LOW |
+| **HTTP 5xx (Server Error)** | Marked retryable in `GitHubApiError`. | YES | Increments `attempts`; exponential backoff applied. | NO (until 5 attempts) | LOW |
+| **Network Timeout / Abort** | PUT outcome uncertain. Triggers `reconcileUncertainWrite`. | NO (Blind) | GET-only reconciliation. If hash matches -> confirmed. If not -> `GITHUB_WRITE_OUTCOME_UNKNOWN`. | YES | LOW |
+| **Post-Write Verification GET Fails** | PUT succeeded, but GET timed out / errored. | NO (Blind) | Overall status becomes `requires_attention` (`GITHUB_RECONCILIATION_REQUIRED`). Commit SHA preserved. | YES | LOW |
+| **Verification Hash Mismatch** | Remote file exists but content differs (third-party overwrite). | NO | Overall status becomes `requires_attention` (`GITHUB_VERIFICATION_FAILED`). | YES | LOW |
+| **Invalid/Traversing Path** | Path engine detects `..`, absolute path, DOS device, or non-ASCII. | NO | Fails closed before HTTP dispatch; transitions to `REQUIRES_ATTENTION`. | YES | LOW |
+| **Source Payload > 500 KB** | Validator and handler check payload size. | NO | Throws `PlatformAdapterError` / `GitHubApiError`; fails closed. | YES | LOW |
+| **Payload Hash Mismatch** | Recalculated source payload hash differs from queue metadata. | NO | Integrity violation; quarantined to `REQUIRES_ATTENTION`. | YES | LOW |
+| **Missing Payload in IDB** | Metadata exists in `storage.local`, payload missing from IndexedDB. | NO | Quarantined to `REQUIRES_ATTENTION` (`PAYLOAD_NOT_FOUND`). | YES | LOW |
+| **Service Worker Crash (Mid-Run)** | Item left in `PROCESSING`. On next startup/drain, `reconcileInterruptedItems` increments `crashCount`. | YES (if < 3) | If `crashCount < 3`, returned to `PENDING`. If `crashCount >= 3`, quarantined as poison pill. | YES (if >= 3) | LOW |
+| **Stale Lease / Worker Yield** | Worker delayed beyond lease TTL; fencing token superseded. | NO | `validateFencingToken` rejects mutation fail-safe (`LEASE_SUPERSEDED`). | NO | LOW |
+
+---
+
+## 6. Crash Boundary Matrix
+
+| Boundary | Interruption Point | Durable State on Disk | Recovery Behavior | Duplicate Write Risk | Test Coverage |
+| :---: | :--- | :--- | :--- | :---: | :---: |
+| **A** | Before WAL intent write | Clean initial state | No-op. Operation never initiated. | ZERO | Covered (`storage-and-wal.test.ts`) |
+| **B** | Intent written; payload not yet committed | WAL: `INTENT`<br>Payload: None<br>Queue: None | `reconcileWalAndOrphans()` detects missing payload and deletes uncommitted WAL entry. | ZERO | Covered (`wal-crash-boundaries.test.ts`) |
+| **C** | Payload written; metadata not written | WAL: `INTENT`<br>Payload: Persisted<br>Queue: Missing | `reconcileWalAndOrphans()` reads payload and WAL snapshot, reconstructs metadata in `storage.local`, commits WAL. | ZERO | Covered (`wal-crash-boundaries.test.ts`) |
+| **D** | Metadata written; WAL not marked committed | WAL: `INTENT`<br>Payload: Persisted<br>Queue: Persisted | `reconcileWalAndOrphans()` observes both payload and metadata exist; deletes WAL entry safely. | ZERO | Covered (`wal-crash-boundaries.test.ts`) |
+| **E** | WAL marked committed; WAL deletion interrupted | WAL: `COMMITTED`<br>Payload: Persisted<br>Queue: Persisted | `reconcileWalAndOrphans()` deletes residual committed WAL entry cleanly. | ZERO | Covered (`wal-crash-boundaries.test.ts`) |
+| **F** | Worker killed while item in `PROCESSING` | Queue: `PROCESSING`<br>Attempts: Unchanged<br>CrashCount: N | `reconcileInterruptedItems()` increments `crashCount`. If $< 3$, resets to `PENDING`. If $\ge 3$, quarantines to `REQUIRES_ATTENTION`. | ZERO (OCC protects remote state) | Covered (`wal-crash-boundaries.test.ts`) |
+| **G** | Worker killed after GitHub PUT, before local commit | GitHub: Committed<br>Queue: `PROCESSING` | On recovery drain, handler pre-flight GET sees remote hash matches intended hash. Returns `skipped_identical`. | ZERO | Covered (`github-contents-write.test.ts`) |
+| **H** | Orphan payload in IndexedDB (no queue metadata) | Payload: Persisted<br>Queue: Missing | `reconcileWalAndOrphans()` discovers unreferenced payload key; creates `REQUIRES_ATTENTION` item to prevent data loss. | ZERO | Covered (`wal-crash-boundaries.test.ts`) |
+
+---
+
+## 7. Security Boundary Audit
+
+### 7.1 DOM / Webpage $\rightarrow$ Content Script
+- **Context Isolation**: Content script runs in an isolated world (`matches` allowlist restricted to official platform domains).
+- **Untrusted Input**: DOM properties, window events, and user scripts are treated as hostile.
+- **Candidate Data**: Extraction produces a candidate object (`CanonicalSubmissionCandidate`), not an authorized action.
+- **Deduplication**: In-memory `SubmissionEventDeduplicator` suppresses duplicate rapid click/DOM events before messaging.
+
+### 7.2 Content Script $\rightarrow$ Background Service Worker
+- **Message Envelope**: [MessageEnvelopeValidator](file:///d:/Parth/Projects/CodeSync/src/shared/messaging/validator.ts#L36) validates envelope structure, UUID v4 nonce, and timestamp freshness.
+- **Anti-Replay**: An in-memory sliding-window cache prevents replay of previously seen nonces.
+- **Sender Context Verification**: Enforces that `senderContext === "content-script"`.
+- **Origin Validation**: [validatePlatformOrigin](file:///d:/Parth/Projects/CodeSync/src/shared/adapters/validator.ts#L35) cross-references `sender.tab.url` with the adapter’s approved origin list. A spoofed message from an arbitrary web page is rejected immediately (`SecurityError`).
+- **ValidatedBy Stamp**: The service worker applies `validatedBy = "SERVICE_WORKER"` to the normalized queue model.
+
+### 7.3 Service Worker $\rightarrow$ Durable Queue
+- **Validation Authority**: Only the service worker can enqueue items. Content scripts have no direct access to `IndexedDB` or `browser.storage.local`.
+- **Target Snapshot Locking**: The service worker captures repository identity, branch, base folder, and duplicate policy into an immutable `TargetSnapshot`. Dynamic user configuration changes made *after* enqueue do not mutate queued items.
+
+### 7.4 Queue $\rightarrow$ GitHub Handler
+- **Provenance Gate**: [GitHubQueueSyncHandler](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L168) verifies `validatedBy === "SERVICE_WORKER"`. If missing or forged, it quarantines the item (`INVARIANT_VIOLATION`).
+- **Integrity Gate**: Recalculates `computeContentHash(payload.sourceCode)` and asserts equality with `item.contentHash`. Any tampering results in immediate quarantine.
+- **Path Security Gate**: [validateAndCanonicalizePath](file:///d:/Parth/Projects/CodeSync/src/shared/github/path-engine.ts#L193) executes three-pillar validation (URL decode recursion, NFKC normalization, separator canonicalization, traversal checks, DOS device rejection, Git directory protection, ASCII-only segment whitelist, base folder boundary enforcement).
+
+### 7.5 GitHub Handler $\rightarrow$ GitHub REST API
+- **HTTPS Enforcement**: API client rejects any non-HTTPS base URL.
+- **Zero Token Leakage**: Tokens are managed by [DurableTokenLifecycleManager](file:///d:/Parth/Projects/CodeSync/src/shared/auth/token-lifecycle.ts#L35); tokens are injected directly into request headers and never returned to the caller or logged.
+- **Log Redaction**: [redactSensitiveData](file:///d:/Parth/Projects/CodeSync/src/shared/logger/redactor.ts#L86) scrubs Bearer tokens, GitHub token prefixes (`ghu_`, `ghr_`, `ghp_`, `gho_`), cookies, authorization headers, and passwords.
+
+---
+
+## 8. Idempotency Audit
+
+### CASE A: Same submission ID + same content
+- **Detection**: Content script deduplicator suppresses event. If dispatched, `QueueManager.enqueueSubmission` matches Hierarchy 2 (`platform === raw.platform && submissionId === raw.submissionId`) against active items and returns existing item without duplicate enqueue.
+- **GitHub**: If already completed and enqueued again, pre-flight GET detects matching remote `contentHash`; duplicate policy `REPLACE_IF_DIFFERENT` returns `skipped_identical`.
+
+### CASE B: Same submission ID + same content after restart
+- **Durable State**: State persists across browser restarts.
+- **Execution**: On recovery drain, the item is either deduplicated in queue or evaluated against GitHub via pre-flight GET, yielding `skipped_identical`.
+
+### CASE C: Different submission IDs + same content
+- **Hierarchy Enforcement**: In [QueueManager.ts:98-102](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L98-L102), different submission IDs are explicitly **not collapsed**, preserving submission identity.
+- **GitHub**: First item commits. Second item executes pre-flight GET; remote hash matches. Duplicate policy `REPLACE_IF_DIFFERENT` cleanly returns `skipped_identical` (or creates version `-v2` under `KEEP_ALL`).
+
+### CASE D: Same submission ID + changed content
+- **Queue**: If previous item is still active (PENDING/PROCESSING), matched by submission ID.
+- **GitHub**: If previous item completed and a revised submission arrives, pre-flight GET detects hash mismatch. Under `REPLACE_IF_DIFFERENT`, it safely updates the file via OCC blob SHA.
+
+### CASE E: Same queue item triggered by alarm + startup simultaneously
+- **Mutual Exclusion**: `QueueConcurrencyManager.runExclusively` coordinates execution via Tier 1 Web Locks (`"codesync:queue:drain"`). The second trigger waits or yields cleanly.
+- **Lease Fencing**: Only one worker holds the active `fencingToken`. The second worker sees items already transitioned to `PROCESSING` or completed.
+
+### CASE F: Same queue item recovered after worker crash
+- **Crash Recovery**: `reconcileInterruptedItems` increments `crashCount` and resets `PROCESSING` $\rightarrow$ `PENDING`.
+- **Idempotent Write**: If crash occurred after GitHub PUT succeeded, the subsequent retry's pre-flight GET matches `contentHash`, returning `skipped_identical` without duplicate commit.
+
+### CASE G: Same repository path modified remotely
+- **Pre-flight & OCC**: Remote file change updates blob SHA.
+- **TOCTOU Protection**: If modified after pre-flight GET, PUT returns HTTP 409 Conflict.
+- **Revalidation**: 8-Step Conflict Protocol fetches fresh remote SHA (max 2 passes). If unresolved, escalates safely to `REQUIRES_ATTENTION`. Zero blind overwrites.
+
+---
+
+## 9. Rate-Limit / Retry Audit
+
+- **Rate Limit Delay Enforcement**:
+  In [src/shared/queue/manager.ts:515-526](file:///d:/Parth/Projects/CodeSync/src/shared/queue/manager.ts#L515-L526):
+  $$\text{effectiveDelay} = \max(\text{backoffDelay}, \text{rateLimitDelay})$$
+  $$\text{item.nextRetryAt} = \text{Date.now}() + \text{effectiveDelay}$$
+- **Rate Limit Classification**:
+  - Primary rate limit: HTTP 429, or HTTP 403 where `x-ratelimit-remaining === 0`.
+  - Secondary abuse throttle: HTTP 403 with `Retry-After` header present and `remaining > 0`. Correctly classified as retryable `GitHubRateLimitError`, **not** an authorization failure.
+  - Authorization failure: HTTP 403 without rate limit headers. Correctly classified as non-retryable `GITHUB_FORBIDDEN`.
+- **Storm Prevention**: Items with `nextRetryAt > Date.now()` are filtered out during queue drain passes. Maximum retry limit is bounded at 5 attempts (`MAX_ATTEMPTS = 5`), after which items are quarantined to `REQUIRES_ATTENTION`.
+
+---
+
+## 10. Uncertain-Write / Reconciliation Audit
+
+- **The Problem**: A network disconnect or timeout occurs during HTTP PUT dispatch. Did GitHub commit the commit or not?
+- **CodeSync Invariant**: `UNKNOWN WRITE != FAILURE` and `UNKNOWN WRITE != SUCCESS`.
+- **Implementation**:
+  In [GitHubContentsService.synchronizeFile:364-401](file:///d:/Parth/Projects/CodeSync/src/shared/github/contents-service.ts#L364-L401):
+  1. On network failure/timeout during PUT, it calls `reconcileUncertainWrite`.
+  2. Executes an authoritative cache-busting GET (`cache: "no-store"`).
+  3. If remote `contentHash === localContentHash`: Confirms write succeeded; returns status `created` or `updated` with `dispatchStatus: "uncertain"` and `verificationStatus: "CONFIRMED"`.
+  4. If remote hash does not match or file does not exist: Throws `GitHubWriteOutcomeUnknownError`.
+  5. In [GitHubQueueSyncHandler:540-550](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts#L540-L550), `GitHubWriteOutcomeUnknownError` maps directly to `status: "requires_attention"`.
+  6. **Zero Blind Overwrites**: The item is quarantined in `REQUIRES_ATTENTION`. The system never issues a second blind PUT.
+
+---
+
+## 11. Cross-Browser Audit
+
+- **Manifest Configuration**:
+  - Chrome MV3: Uses `background.service_worker: "background.js"`.
+  - Firefox MV3: Uses `background.scripts: ["background.js"]` (event page mode, compliant with Firefox Gecko MV3 architecture).
+  - Minimum Gecko version: Strictly set to `"128.0"`.
+- **Web Locks Support**: Supported in Chrome and in Firefox 128+. In environments lacking Web Locks, `QueueConcurrencyManager` and `DurableTokenLifecycleManager` seamlessly fall back to Tier 2 persistent leases stored in `browser.storage.local`.
+- **Storage & Alarms**: Standard WebExtension APIs (`browser.storage.local`, `browser.alarms`) wrapped with safe cross-browser fallbacks (`chrome.*` vs `browser.*`).
+- **Testing Status**: Static manifest compliance and capabilities detection are verified in unit tests. Real browser execution via Playwright/Puppeteer is currently not present in `package.json`.
+
+---
+
+## 12. Diagnostics / History Audit
+
+- **Sync History**:
+  - Completed items (`"synced"` and `"skipped"`) are recorded in the IndexedDB `history` store via [PayloadStorage.putHistory](file:///d:/Parth/Projects/CodeSync/src/shared/storage/indexeddb.ts#L216).
+  - IndexedDB stores `id`, `submissionId`, `platform`, `problemTitle`, `problemSlug`, `targetRepository`, `targetBranch`, `language`, `contentHash`, `commitSha`, `commitUrl`, `completedAt`, and `status`.
+- **In-Flight / Failed State History**:
+  - Items in `PENDING`, `PROCESSING`, `FAILED`, and `REQUIRES_ATTENTION` states reside in `browser.storage.local` under `codesync_queue_metadata`.
+  - Failure details (`code`, `message`, `timestamp`) are persisted in `QueueItemMetadata.lastError`.
+- **Secret Scrubbing**:
+  - [redactSensitiveData](file:///d:/Parth/Projects/CodeSync/src/shared/logger/redactor.ts#L86) scrubs all credentials, tokens, cookies, auth headers, and raw source code from diagnostic logs.
+- **UI & Diagnostics Observability**:
+  - The extension popup ([src/entrypoints/popup/App.tsx](file:///d:/Parth/Projects/CodeSync/src/entrypoints/popup/App.tsx#L11)) is currently a static Phase 1A placeholder. There is no user-facing UI component yet to inspect queue states or sync history (scheduled for Phase 2).
+
+---
+
+## 13. Test Coverage Gap Analysis
+
+### Current Proven Coverage (442 Tests):
+- **Adapter Layer**: Origin security, candidate extraction, schema validation, character normalization for LeetCode, CodeChef, Codeforces, GeeksforGeeks.
+- **Messaging Layer**: Envelope validation, UUID v4 nonce generation, anti-replay sliding window, sender context checks.
+- **WAL & Storage**: Dual-tier storage (IndexedDB + `storage.local`), WAL intent/mutating/committed lifecycle, payload bounds (500 KB).
+- **Crash Recovery**: Crash boundaries A through H, orphan payload reconciliation, poison-pill isolation ($crashCount \ge 3$).
+- **Concurrency & Leasing**: Web Locks integration, persistent lease fallback, fencing token monotonicity.
+- **Drainer Triggers**: Periodic alarm (5m), startup trigger, submission trigger, unconfigured handler fail-closed safety.
+- **GitHub Client & Handler**: Safe URL building, 401 token refresh coordination, rate-limit classification, path engine canonicalization, OCC 409 handling, uncertain write handling.
+
+### Coverage Gaps to Address in Phase 1C.4.3.1:
+1. **Uninterrupted Pipeline Integration Test**: A single end-to-end integration test that simulates the entire sequence: content script message dispatch $\rightarrow$ service worker message listener $\rightarrow$ WAL enqueue $\rightarrow$ queue drain pass $\rightarrow$ GitHub handler $\rightarrow$ mock GitHub API response $\rightarrow$ queue item completion $\rightarrow$ history persistence.
+2. **Real Extension Message Listener Execution**: Testing `browser.runtime.onMessage` inside `background.ts` with actual async `sendResponse` resolution and follow-up drain trigger.
+3. **Multi-Item Batch Drain Integration**: Enqueueing multiple submissions from different platforms and draining them sequentially under a single simulated drain pass.
+4. **End-to-End Rate-Limit Retry Cycle**: Simulating a primary 429 response from the GitHub API mock, verifying queue state transitions to `FAILED` with `nextRetryAt`, advancing virtual time, triggering an alarm, and confirming eventual successful synchronization.
+5. **End-to-End Uncertain Write Reconciliation**: Simulating a network drop during PUT, verifying transition to `REQUIRES_ATTENTION`, and exercising reconciliation GET.
+
+---
+
+## 14. Findings
+
+### FINDING-1C.4.3.0-01 — INFO
+- **Severity**: INFO
+- **File**: [src/entrypoints/popup/App.tsx:75-84](file:///d:/Parth/Projects/CodeSync/src/entrypoints/popup/App.tsx#L75-L84)
+- **Evidence**: Popup UI contains static Phase 1A placeholder markup and does not display queue status, error states, or sync history.
+- **Impact**: Zero runtime impact on synchronization engine. User cannot view queue state from popup UI.
+- **Current Mitigation**: Queue metadata and sync history are durably stored in `browser.storage.local` and IndexedDB.
+- **Recommendation**: Defer to Phase 2 (Extension UI & Settings).
+- **Blocks 1C.4.3.1**: **NO**.
+
+### FINDING-1C.4.3.0-02 — P3
+- **Severity**: P3 (Testing Completeness)
+- **File**: [tests/security/](file:///d:/Parth/Projects/CodeSync/tests/security/)
+- **Evidence**: Existing 442 tests are partitioned into component-level unit and integration suites (`submission-to-queue.test.ts`, `queue-github-handler.test.ts`, `queue-drainer.test.ts`, etc.). No unified test exercises the complete unbroken chain from message envelope to GitHub sync completion.
+- **Impact**: End-to-end behavior is verified across component seams, but not validated in a single composite integration test file.
+- **Current Mitigation**: Strong component integration coverage across all boundaries.
+- **Recommendation**: Create dedicated end-to-end verification suites in Phase 1C.4.3.1.
+- **Blocks 1C.4.3.1**: **NO** (This is the specific charter of Phase 1C.4.3.1).
+
+### FINDING-1C.4.3.0-03 — INFO
+- **Severity**: INFO
+- **File**: `package.json`
+- **Evidence**: Build for Firefox outputs a warning regarding upcoming `data_collection_permissions` required by Mozilla from November 2025 (`WARN Firefox requires data_collection_permissions...`).
+- **Impact**: Zero impact on current MV3 extension functionality or testing.
+- **Current Mitigation**: WXT config can set `suppressWarnings.firefoxDataCollection: true` or define appropriate metadata when targeting production AMO submission.
+- **Recommendation**: Track for production release packaging; no code change needed in 1C.4.3.
+- **Blocks 1C.4.3.1**: **NO**.
+
+---
+
+## 15. Required Changes Before 1C.4.3.1
+
+**ZERO changes are required.**
+No source code, test files, configuration files, or architectural definitions require alteration before initiating Phase 1C.4.3.1. The repository is structurally complete and fully verified.
+
+---
+
+## 16. Recommended 1C.4.3.1 Test Plan
+
+Phase 1C.4.3.1 should implement a comprehensive end-to-end integration test suite (`tests/integration/pipeline-e2e.test.ts` or `tests/security/pipeline-e2e.test.ts`) structured around the following categories:
+
+### Test Suite 1: Full Happy-Path Pipeline Integration
+- **Scenario E2E-01**: LeetCode submission detection $\rightarrow$ envelope generation $\rightarrow$ service worker message handling $\rightarrow$ WAL enqueue $\rightarrow$ drainer invocation $\rightarrow$ GitHub handler $\rightarrow$ GitHub API mock 201 Created $\rightarrow$ post-write verification GET 200 OK $\rightarrow$ item `COMPLETED` $\rightarrow$ history entry written in IndexedDB.
+- **Scenario E2E-02**: Multi-platform batch drain (LeetCode, Codeforces, CodeChef, GeeksforGeeks) queued concurrently, drained sequentially under single drain pass.
+
+### Test Suite 2: Duplicate Policy & OCC End-to-End
+- **Scenario E2E-03**: `REPLACE_IF_DIFFERENT` policy with identical remote content hash $\rightarrow$ pre-flight GET skips PUT $\rightarrow$ item `SKIPPED` $\rightarrow$ history entry recorded.
+- **Scenario E2E-04**: `KEEP_ALL` policy with existing file $\rightarrow$ resolves versioned `-v2` path $\rightarrow$ commits new version cleanly.
+- **Scenario E2E-05**: HTTP 409 Conflict during PUT $\rightarrow$ executes 8-step conflict revalidation $\rightarrow$ re-reads fresh remote SHA $\rightarrow$ updates file successfully.
+
+### Test Suite 3: Resilience & Recovery End-to-End
+- **Scenario E2E-06**: Simulated crash during `PROCESSING` state $\rightarrow$ service worker restarts $\rightarrow$ startup trigger fires $\rightarrow$ `reconcileInterruptedItems` resets item $\rightarrow$ successful drain on second pass.
+- **Scenario E2E-07**: Primary rate limit (HTTP 429) received $\rightarrow$ item transitions to `FAILED` with `nextRetryAt` $\rightarrow$ subsequent drain passes before `nextRetryAt` skip item $\rightarrow$ drain pass after `nextRetryAt` succeeds.
+- **Scenario E2E-08**: Uncertain write (network timeout during PUT) $\rightarrow$ item transitions safely to `REQUIRES_ATTENTION` (`GITHUB_WRITE_OUTCOME_UNKNOWN`) with zero blind duplicate PUTs.
+
+### Test Suite 4: Security Boundary Enforcement
+- **Scenario E2E-09**: Hostile message from unauthorized sender context or mismatched origin $\rightarrow$ rejected fail-closed at service worker boundary with `SecurityError`.
+- **Scenario E2E-10**: Forged `validatedBy` stamp or tampered source payload $\rightarrow$ quarantined at GitHub handler boundary with `INVARIANT_VIOLATION`.
+
+---
+
+## 17. Out of Scope
+
+The following areas are explicitly **OUT OF SCOPE** and must NOT be touched during Phase 1C.4.3:
+1. **Extension UI & Popup**: `src/entrypoints/popup/` remains in its foundation state until Phase 2.
+2. **Platform Adapters Implementation**: The four platform adapters (LeetCode, CodeChef, Codeforces, GeeksforGeeks) are frozen baselines.
+3. **GitHub API Contracts**: `GitHubApiClient`, `GitHubContentsService`, and `DurableTokenLifecycleManager` are frozen baselines.
+4. **Queue & WAL Core Architecture**: `QueueManager`, `PayloadStorage`, and `QueueConcurrencyManager` algorithms are frozen baselines.
+5. **Manifest Permissions**: No new permissions (`<all_urls>`, `tabs`, `webRequest`, etc.) may be requested.
+
+---
+
+## 18. Final Gate Recommendation
+
+### **APPROVE 1C.4.3.1**
+
+The CodeSync implementation has strictly satisfied all architectural, security, reliability, and correctness invariants. The foundation is robust, zero defects block execution, and the repository is completely prepared for Phase 1C.4.3.1.
+
+---
+
+```
+============================================================
+PHASE 1C.4.3.0 GATE
+============================================================
+
+Status:                  APPROVE 1C.4.3.1
+Blocking Findings:       0
+Non-Blocking Findings:   3 (FINDING-1C.4.3.0-01, 02, 03)
+Current Test Count:      442 passed / 442 total (34 test files)
+Build Status:            Chrome MV3: PASS | Firefox MV3: PASS
+Compile / Lint / Format: 0 errors | 0 warnings | 100% formatted
+Recommended Next Step:   Proceed to PHASE 1C.4.3.1 (End-to-End Pipeline Verification)
+============================================================
+```

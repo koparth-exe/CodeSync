@@ -1,0 +1,28 @@
+{
+  "testId": "RB-INSTALL-01",
+  "browser": "chromium",
+  "browserVersion": "153.0.8010.12",
+  "extensionVersion": "0.1.0",
+  "manifestVersion": 3,
+  "timestamp": "2026-09-17T16:21:57.217Z",
+  "status": "PASS",
+  "relevantRuntimeState": {
+    "extensionId": "mcfbcmplcolffmpkkgjookmdfgfohlik",
+    "serviceWorkerUrl": "chrome-extension://mcfbcmplcolffmpkkgjookmdfgfohlik/background.js",
+    "isRunning": true
+  },
+  "relevantStorageState": {
+    "permissionsGranted": ["storage", "alarms"],
+    "hostPermissionsGranted": [
+      "https://github.com/*",
+      "https://api.github.com/*"
+    ]
+  },
+  "consoleErrors": [],
+  "invariantsExercised": [
+    "CHROMIUM_MV3_MANIFEST_ACCEPTED",
+    "BACKGROUND_SERVICE_WORKER_REGISTERED",
+    "PERMISSIONS_STORAGE_ALARMS_ACCEPTED",
+    "HOST_PERMISSIONS_GITHUB_ACCEPTED"
+  ]
+}
