@@ -1,4 +1,4 @@
-# CodeSync
+# CodeSync (In Development)
 
 > **Synchronize verified competitive programming solutions directly to GitHub.**
 
