@@ -55,7 +55,7 @@ Searched for "handler.ts"
 Viewed token-lifecycle.ts:1-100
 Created implementation_plan.md
 
-I have created the implementation plan for **Phase 1C.4.2.2 — Real Queue Item → GitHub Synchronization Handler Integration** in [implementation_plan.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/21f46896-cb2e-41f8-9852-be6e89b770b4/implementation_plan.md).
+I have created the implementation plan for **Phase 1C.4.2.2 — Real Queue Item → GitHub Synchronization Handler Integration** in [implementation_plan.md](./implementation_plan-Phase 1C.4.2.2.md).
 
 Please review the plan and let me know if you would like me to proceed with execution.
 
@@ -218,7 +218,7 @@ Zero Direct Queue State Mutation from Handler
 | [index.ts](file:///d:/Parth/Projects/CodeSync/src/shared/queue/index.ts) | **MODIFIED** | Exports `GitHubQueueSyncHandler`, `createGitHubQueueItemHandler`, `LANGUAGE_EXTENSION_MAP`, and `resolveLanguageExtension`. |
 | [background.ts](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts) | **MODIFIED** | Instantiates trusted `GitHubApiClient` and `GitHubContentsService`; registers real handler via `defaultQueueDrainer.setHandler(...)`. |
 | [queue-github-handler.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/queue-github-handler.test.ts) | **NEW** | Complete 31-test deterministic test suite validating `HANDLER-01` through `HANDLER-30` and full `E2E-FLOW`. |
-| [walkthrough.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/21f46896-cb2e-41f8-9852-be6e89b770b4/walkthrough.md) | **MODIFIED** | Updated with implementation walkthrough, architecture mappings, and verification results. |
+| [walkthrough.md](./walkthrough-Phase 1C.4.2.2.md) | **MODIFIED** | Updated with implementation walkthrough, architecture mappings, and verification results. |
 
 ---
 

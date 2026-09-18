@@ -289,7 +289,7 @@
       "timestamp": "2026-09-17T16:22:38.322Z",
       "status": "PASS",
       "relevantRuntimeState": {
-        "profileDir": "C:\\Users\\Tejasvini\\AppData\\Local\\Temp\\codesync-ff-persist-HLyRs4",
+        "profileDir": "<SANITIZED_TEMP_DIR>/codesync-ff-persist-HLyRs4",
         "restartedWithSameProfile": true
       },
       "relevantStorageState": {

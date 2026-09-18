@@ -16,7 +16,7 @@ Created implementation_plan.md
 
 I have created the detailed implementation plan for **Phase 1C.3: Platform Adapter Architecture & Submission Detection**.
 
-Please review the plan in [implementation_plan.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/98066a31-ed20-4ea9-b5d0-5d845ae02183/implementation_plan.md).
+Please review the plan in `implementation_plan.md`.
 
 ### Summary of Key Architecture & Design Highlights for Your Review:
 1. **Canonical Adapter Subsystem**: Establishes `src/shared/adapters/` with clean interface contracts, an in-memory event deduplicator (composite identity, sliding TTL window), and an extension-controlled adapter registry.

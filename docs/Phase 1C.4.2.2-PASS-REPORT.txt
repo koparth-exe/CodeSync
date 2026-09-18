@@ -83,7 +83,7 @@ Ran command: `npm run format:check`
 1. [tests/security/queue-github-handler.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/queue-github-handler.test.ts):
    - Added imports: `MAX_SOURCE_PAYLOAD_BYTES`, `StorageError`.
    - Added comprehensive test suite: `PAYLOAD-01` through `PAYLOAD-05`.
-2. [walkthrough.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/21f46896-cb2e-41f8-9852-be6e89b770b4/walkthrough.md):
+2. [walkthrough.md](./walkthrough-Phase 1C.4.2.2.md):
    - Corrected all references from `100KB` to `500 KB (512,000 bytes)`.
 
 *(No changes were required to [src/shared/github/types.ts](file:///d:/Parth/Projects/CodeSync/src/shared/github/types.ts) or [src/shared/queue/github-handler.ts](file:///d:/Parth/Projects/CodeSync/src/shared/queue/github-handler.ts) as both were already correctly enforcing `512_000` bytes).*
@@ -131,7 +131,7 @@ In [tests/security/queue-github-handler.test.ts](file:///d:/Parth/Projects/CodeS
 1. [tests/security/queue-github-handler.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/queue-github-handler.test.ts):
    - Added imports: `QUEUE_DRAIN_ALARM_NAME`, `QUEUE_DRAIN_ALARM_PERIOD_MINUTES`, `setupQueueDrainAlarm`.
    - Added comprehensive test suite: `ALARM-01` through `ALARM-06`.
-2. [walkthrough.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/21f46896-cb2e-41f8-9852-be6e89b770b4/walkthrough.md):
+2. [walkthrough.md](./walkthrough-Phase 1C.4.2.2.md):
    - Corrected all prose references to 5-minute alarm cadence.
 
 *(No changes were required to [src/shared/queue/drainer.ts](file:///d:/Parth/Projects/CodeSync/src/shared/queue/drainer.ts) or [src/entrypoints/background.ts](file:///d:/Parth/Projects/CodeSync/src/entrypoints/background.ts) as both were already configured for 5 minutes).*
@@ -257,7 +257,7 @@ i Building firefox-mv3 for production with Vite 8.3.0
 ### 20. Git Diff / Status Summary
 
 - [tests/security/queue-github-handler.test.ts](file:///d:/Parth/Projects/CodeSync/tests/security/queue-github-handler.test.ts): Added test suites `PAYLOAD-01` through `PAYLOAD-05` and `ALARM-01` through `ALARM-06`.
-- [walkthrough.md](file:///C:/Users/Tejasvini/.gemini/antigravity-ide/brain/21f46896-cb2e-41f8-9852-be6e89b770b4/walkthrough.md): Updated documentation to reflect 500 KB (512,000 bytes) and 5-minute alarm cadence.
+- [walkthrough.md](./walkthrough-Phase 1C.4.2.2.md): Updated documentation to reflect 500 KB (512,000 bytes) and 5-minute alarm cadence.
 
 ---
 

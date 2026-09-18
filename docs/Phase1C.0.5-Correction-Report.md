@@ -317,7 +317,7 @@ Section V of the architecture review includes 36 automated test specifications i
 - `docs/Phase1C-Architecture-Review.md`
 - `docs/GITHUB-INTEGRATION.md`
 - `docs/ARCHITECTURE.md`
-- `C:/Users/Tejasvini/.gemini/antigravity-ide/brain/98066a31-ed20-4ea9-b5d0-5d845ae02183/walkthrough.md`
+- `walkthrough-Phase 1C.0.5.md`
 - `docs/Phase1C.0.5-Correction-Report.md` (newly created)
 
 ### 3. Issues Resolved

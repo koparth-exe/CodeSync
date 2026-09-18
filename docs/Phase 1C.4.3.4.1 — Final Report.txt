@@ -26,15 +26,15 @@ Viewed Phase%201C.4.3.3.2%20Implementation%20Report.txt:1-150
 Viewed POST-1C.4.3.3.2%20STATE%20AUDIT.txt:1-101
 Ran command: `Get-ChildItem -Recurse -File node_modules\.vite | Select-Object FullName, LastWriteTime`
 Ran command: `Get-ChildItem -Recurse .output | Select-Object FullName, Length, @{Name="Time";Expression={$_.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss")}}`
-Ran command: `Get-ChildItem -Path "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\cfc0ba5d-a3e9-4187-af32-b41e39ed1d38" -Recurse`
-Ran command: `Get-ChildItem -Path "C:\Users\Tejasvini\.gemini\antigravity-ide\brain" | Sort-Object LastWriteTime -Descending | Select-Object Name, LastWriteTime`
-Ran command: `Get-ChildItem -Path "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc" -Recurse`
+Ran command: `Get-ChildItem -Path "<AGENT_BRAIN_DIR>\cfc0ba5d-a3e9-4187-af32-b41e39ed1d38" -Recurse`
+Ran command: `Get-ChildItem -Path "<AGENT_BRAIN_DIR>" | Sort-Object LastWriteTime -Descending | Select-Object Name, LastWriteTime`
+Ran command: `Get-ChildItem -Path "<AGENT_BRAIN_DIR>\08817f4f-9344-40f1-a4bc-6c633048f4cc" -Recurse`
 Viewed task-275.log:1-51
-Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\tasks\task-270.log" -Tail 60`
-Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\tasks\task-237.log"`
+Ran command: `Get-Content "<AGENT_BRAIN_DIR>\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\tasks\task-270.log" -Tail 60`
+Ran command: `Get-Content "<AGENT_BRAIN_DIR>\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\tasks\task-237.log"`
 Viewed task-225.log:1-334
-Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\logs\transcript.jsonl" -Tail 5`
-Ran command: `Get-Content "C:\Users\Tejasvini\.gemini\antigravity-ide\brain\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\logs\transcript_full.jsonl" -Tail 1`
+Ran command: `Get-Content "<AGENT_BRAIN_DIR>\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\logs\transcript.jsonl" -Tail 5`
+Ran command: `Get-Content "<AGENT_BRAIN_DIR>\08817f4f-9344-40f1-a4bc-6c633048f4cc\.system_generated\logs\transcript_full.jsonl" -Tail 1`
 Searched for "1C.4.3.4.2"
 Viewed Phase%201C.4.3.3%20plan.txt:1-150
 
